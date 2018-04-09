@@ -21,7 +21,8 @@ struct TinySCF_struct
 	
 	// Integrals
 	SIMINT_t simint;
-	int *shell_bf_sidx;   // Index of the first basis function of each shell
+	int *shell_bf_sind;   // Index of the first basis function of each shell
+	int *shell_bf_num;    // Number of basis function in each shell
 	
 	// Matrices
 	double *H_core;       // Core Hamiltonian matrix
