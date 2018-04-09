@@ -10,13 +10,15 @@
 // Tiny SCF engine
 struct TinySCF_struct 
 {
+	int nthreads;
+	
 	// Problem info
 	BasisSet_t basis;
 	int niters, natoms, nshells, nbasfuncs;
 	int charge, nshellpairs, mat_size;
 	
-	// Screening 
-	double prim_screen_tol2, shell_screen_tol2;
+	// Shell quartet screening 
+	double shell_screen_tol2;
 	double *sp_scr_vals;  // Screening values (upper bound) of each shell pair
 	
 	// Integrals
@@ -25,7 +27,7 @@ struct TinySCF_struct
 	int *shell_bf_num;    // Number of basis function in each shell
 	
 	// Matrices
-	double *H_core;       // Core Hamiltonian matrix
+	double *Hcore_mat;    // Core Hamiltonian matrix
 	double *Ovlp_mat;     // Overlap matrix
 	double *Fock_mat;     // Fock matrix
 	double *prev_Fock;    // Previous Fock matrices, for DIIS
@@ -39,6 +41,9 @@ typedef struct TinySCF_struct* TinySCF_t;
 // Initialize TinySCF with a Cartesian basis set file (.gbs format), a molecule 
 // coordinate file and the number of SCF iterations
 void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int niters);
+
+// Compute core Hamiltonian and overlap matrix
+void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF);
 
 // Destroy TinySCF 
 void free_TinySCF(TinySCF_t TinySCF);
