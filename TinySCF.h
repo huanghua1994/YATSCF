@@ -18,8 +18,11 @@ struct TinySCF_struct
 	int charge, nshellpairs, mat_size, n_occ;
 	
 	// Shell quartet screening 
-	double shell_screen_tol2;
-	double *sp_scr_vals;  // Screening values (upper bound) of each shell pair
+	double shell_screen_tol2, max_scrval;
+	double *sp_scr_vals;  // Square of screening values (upper bound) of each shell pair
+	int    *uniq_sp_lid;  // Left shell id of all unique shell pairs
+	int    *uniq_sp_rid;  // Right shell id of all unique shell pairs
+	int    num_uniq_sp;   // Number of unique shell pairs (== nshells * (nshells+1) / 2)
 	
 	// Integrals
 	SIMINT_t simint;
@@ -48,6 +51,10 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 
 // Compute core Hamiltonian and overlap matrix
 void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF);
+
+// Compute the screening values of each shell quartet and the unique shell pairs
+// that survive screening using Schwarz inequality
+void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF);
 
 // Destroy TinySCF 
 void free_TinySCF(TinySCF_t TinySCF);

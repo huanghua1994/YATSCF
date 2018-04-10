@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include "utils.h"
 
@@ -12,6 +13,15 @@ void copy_matrix_block(
 	for (int irow = 0; irow < nrows; irow++)
 		memcpy(dst + irow * ldd, src + irow * lds, DBL_SIZE * ncols);
 } 
+
+double get_wtime_sec()
+{
+    double sec;
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    sec = tv.tv_sec + (double) tv.tv_usec / 1000000.0;
+    return sec;
+}
 
 // For debug
 void print_mat(double *mat, const int ldm, const int nrows, const int ncols, const char *mat_name)

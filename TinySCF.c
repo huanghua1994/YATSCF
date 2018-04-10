@@ -48,7 +48,6 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->shell_screen_tol2 = 1e-11 * 1e-11;
 	
 	// Allocate memory for matrices
-	TinySCF->sp_scr_vals = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nshellpairs);
 	TinySCF->Hcore_mat   = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
 	TinySCF->S_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
 	TinySCF->F_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
@@ -57,7 +56,6 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->K_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
 	TinySCF->X_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
 	TinySCF->prev_F_mat  = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size * MAX_DIIS);
-	assert(TinySCF->sp_scr_vals   != NULL);
 	assert(TinySCF->Hcore_mat     != NULL);
 	assert(TinySCF->S_mat         != NULL);
 	assert(TinySCF->F_mat         != NULL);
@@ -66,14 +64,22 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	assert(TinySCF->K_mat         != NULL);
 	assert(TinySCF->X_mat         != NULL);
 	assert(TinySCF->prev_F_mat    != NULL);
-	TinySCF->mem_size += DBL_SIZE * (TinySCF->nshellpairs + (MAX_DIIS + 7) * TinySCF->mat_size);
+	TinySCF->mem_size += DBL_SIZE * (MAX_DIIS + 7) * TinySCF->mat_size;
 
 	// Allocate memory for all shells' basis function info
-	TinySCF->shell_bf_sind = (int*) ALIGN64B_MALLOC(INT_SIZE * (TinySCF->nshells + 1));
-	TinySCF->shell_bf_num  = (int*) ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshells);
+	TinySCF->num_uniq_sp   = (TinySCF->nshells + 1) * TinySCF->nshells / 2;
+	TinySCF->sp_scr_vals   = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nshellpairs);
+	TinySCF->shell_bf_sind = (int*)    ALIGN64B_MALLOC(INT_SIZE * (TinySCF->nshells + 1));
+	TinySCF->shell_bf_num  = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshells);
+	TinySCF->uniq_sp_lid   = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->num_uniq_sp);
+	TinySCF->uniq_sp_rid   = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->num_uniq_sp);
+	assert(TinySCF->sp_scr_vals   != NULL);
 	assert(TinySCF->shell_bf_sind != NULL);
 	assert(TinySCF->shell_bf_num  != NULL);
-	TinySCF->mem_size += INT_SIZE * (2 * TinySCF->nshells + 1);
+	assert(TinySCF->uniq_sp_lid   != NULL);
+	assert(TinySCF->uniq_sp_rid   != NULL);
+	TinySCF->mem_size += DBL_SIZE * TinySCF->nshellpairs + INT_SIZE * (2 * TinySCF->nshells + 1) 
+					   + INT_SIZE * 2 * TinySCF->num_uniq_sp;
 	for (int i = 0; i < TinySCF->nshells; i++)
 	{
 		TinySCF->shell_bf_sind[i] = CInt_getFuncStartInd(TinySCF->basis, i);
@@ -145,6 +151,40 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 	ALIGN64B_FREE(eigval);
 }
 
+void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
+{
+	// Compute screening values using Schwarz inequality
+	double global_max_scrval = 0.0;
+	for (int M = 0; M < TinySCF->nshells; M++)
+	{
+		int dimM = TinySCF->shell_bf_num[M];
+		for (int N = 0; N < TinySCF->nshells; N++)
+		{
+			int dimN = TinySCF->shell_bf_num[N];
+			
+			int nints;
+			double *integrals;
+			CInt_computeShellQuartet_SIMINT(TinySCF->simint, 0, M, N, M, N, &integrals, &nints);
+			
+			double maxval = 0.0;
+			if (nints > 0)
+			{
+				// Loop over all ERIs in a shell quartet and find the max value
+				for (int iM = 0; iM < dimM; iM++)
+					for (int iN = 0; iN < dimN; iN++)
+					{
+						int index = iN * (dimM*dimN*dimM+dimM) + iM * (dimN*dimM+1); // Simint layout
+						double val = fabs(integrals[index]);
+						if (val > maxval) maxval = val;
+					}
+			}
+			TinySCF->sp_scr_vals[M * TinySCF->nshells + N] = maxval;
+			if (maxval > global_max_scrval) global_max_scrval = maxval;
+		}
+	}
+	
+}
+
 void free_TinySCF(TinySCF_t TinySCF)
 {
 	assert(TinySCF != NULL);
@@ -160,6 +200,8 @@ void free_TinySCF(TinySCF_t TinySCF)
 	ALIGN64B_FREE(TinySCF->prev_F_mat);
 	ALIGN64B_FREE(TinySCF->shell_bf_sind);
 	ALIGN64B_FREE(TinySCF->shell_bf_num);
+	ALIGN64B_FREE(TinySCF->uniq_sp_lid);
+	ALIGN64B_FREE(TinySCF->uniq_sp_rid);
 	
 	free(TinySCF);
 }
