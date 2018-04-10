@@ -15,7 +15,7 @@ struct TinySCF_struct
 	// Problem info
 	BasisSet_t basis;
 	int niters, natoms, nshells, nbasfuncs;
-	int charge, nshellpairs, mat_size;
+	int charge, nshellpairs, mat_size, n_occ;
 	
 	// Shell quartet screening 
 	double shell_screen_tol2;
@@ -27,14 +27,14 @@ struct TinySCF_struct
 	int *shell_bf_num;    // Number of basis function in each shell
 	
 	// Matrices
-	double *Hcore_mat;    // Core Hamiltonian matrix
-	double *Ovlp_mat;     // Overlap matrix
-	double *Fock_mat;     // Fock matrix
-	double *Dens_mat;     // Density matrix
-	double *J_mat;        // Coulomb matrix
-	double *K_mat;        // Exchange matrix
-	double *X_mat;        // Exchange matrix
-	double *prev_Fock;    // Previous Fock matrices, for DIIS
+	double *Hcore_mat;   // Core Hamiltonian matrix
+	double *S_mat;       // Overlap matrix
+	double *F_mat;       // Fock matrix
+	double *D_mat;       // Density matrix
+	double *J_mat;       // Coulomb matrix
+	double *K_mat;       // Exchange matrix
+	double *X_mat;       // Basis transformation matrix
+	double *prev_F_mat;  // Previous Fock matrices, for DIIS
 	
 	// Statistic 
 	double mem_size;
