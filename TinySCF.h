@@ -30,6 +30,9 @@ struct TinySCF_struct
 	double *Hcore_mat;    // Core Hamiltonian matrix
 	double *Ovlp_mat;     // Overlap matrix
 	double *Fock_mat;     // Fock matrix
+	double *Dens_mat;     // Density matrix
+	double *J_mat;        // Coulomb matrix
+	double *K_mat;        // Exchange matrix
 	double *prev_Fock;    // Previous Fock matrices, for DIIS
 	
 	// Statistic 

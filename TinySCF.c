@@ -5,6 +5,7 @@
 
 #include "CInt.h"
 #include "TinySCF.h"
+#include "utils.h"
 
 #define ALIGN64B_MALLOC(x) _mm_malloc((x), 64)
 #define ALIGN64B_FREE(x)   _mm_free(x)
@@ -49,13 +50,19 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->Hcore_mat   = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
 	TinySCF->Ovlp_mat    = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
 	TinySCF->Fock_mat    = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
+	TinySCF->Dens_mat    = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
+	TinySCF->J_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
+	TinySCF->K_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
 	TinySCF->prev_Fock   = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size * MAX_DIIS);
 	assert(TinySCF->sp_scr_vals   != NULL);
 	assert(TinySCF->Hcore_mat     != NULL);
 	assert(TinySCF->Ovlp_mat      != NULL);
 	assert(TinySCF->Fock_mat      != NULL);
+	assert(TinySCF->Dens_mat      != NULL);
+	assert(TinySCF->J_mat         != NULL);
+	assert(TinySCF->K_mat         != NULL);
 	assert(TinySCF->prev_Fock     != NULL);
-	TinySCF->mem_size += DBL_SIZE * (TinySCF->nshellpairs + (MAX_DIIS + 3) * TinySCF->mat_size);
+	TinySCF->mem_size += DBL_SIZE * (TinySCF->nshellpairs + (MAX_DIIS + 6) * TinySCF->mat_size);
 
 	// Allocate memory for all shells' basis function info
 	TinySCF->shell_bf_sind = (int*) ALIGN64B_MALLOC(INT_SIZE * (TinySCF->nshells + 1));
@@ -100,28 +107,7 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 	memset(TinySCF->Ovlp_mat,  0, DBL_SIZE * TinySCF->mat_size);
 
 	for (int M = 0; M < TinySCF->nshells; M++)
-		for (int N = 0; N < TinySCF->nshells; N++)
-		{
-			int nints, tid = 0;
-			double *integrals;
-			
-			int mat_topleft_offset = TinySCF->shell_bf_sind[M] * TinySCF->nbasfuncs + TinySCF->shell_bf_sind[N];
-			double *Ovlp_mat_ptr   = TinySCF->Ovlp_mat  + mat_topleft_offset;
-			double *Hcore_mat_ptr  = TinySCF->Hcore_mat + mat_topleft_offset;
-			
-			int nrows = TinySCF->shell_bf_sind[M + 1] - TinySCF->shell_bf_sind[M];
-			int ncols = TinySCF->shell_bf_sind[N + 1] - TinySCF->shell_bf_sind[N];
-			
-			// Compute the contribution of current shell pair to core Hamiltonian matrix
-			//CInt_computePairOvl_SIMINT(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
-			//if (nints > 0) copy_matrix_block(Ovlp_mat_ptr, TinySCF->nbasfuncs, integrals, ncols, nrows, ncols);
-			
-			// Compute the contribution of current shell pair to overlap matrix
-			CInt_computePairCoreH_SIMINT(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
-			if (nints > 0) copy_matrix_block(Hcore_mat_ptr, TinySCF->nbasfuncs, integrals, ncols, nrows, ncols);
-		}
-	
-	for (int M = 0; M < TinySCF->nshells; M++)
+	{
 		for (int N = 0; N < TinySCF->nshells; N++)
 		{
 			int nints, tid = 0;
@@ -139,39 +125,14 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 			if (nints > 0) copy_matrix_block(Ovlp_mat_ptr, TinySCF->nbasfuncs, integrals, ncols, nrows, ncols);
 			
 			// Compute the contribution of current shell pair to overlap matrix
-			//CInt_computePairCoreH_SIMINT(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
-			//if (nints > 0) copy_matrix_block(Hcore_mat_ptr, TinySCF->nbasfuncs, integrals, ncols, nrows, ncols);
+			CInt_computePairCoreH_SIMINT(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
+			if (nints > 0) copy_matrix_block(Hcore_mat_ptr, TinySCF->nbasfuncs, integrals, ncols, nrows, ncols);
 		}
+	}
 	
 	// For debug
-	// Print overlap matrix
-	printf("Overlap:\n");
-	for (int i = 0; i < TinySCF->nbasfuncs; i++)
-	{
-		for (int j = 0; j < TinySCF->nbasfuncs; j++) 
-		{
-			int idx = i * TinySCF->nbasfuncs + j;
-			double x = TinySCF->Ovlp_mat[idx];
-			if (x >= 0.0) printf(" ");
-			printf("%.7lf\t", x);
-		}
-		printf("\n");
-	}
-	printf("\n");
-	// Print core Hamiltonian matrix
-	printf("core Hamiltonian:\n");
-	for (int i = 0; i < TinySCF->nbasfuncs; i++)
-	{
-		for (int j = 0; j < TinySCF->nbasfuncs; j++) 
-		{
-			int idx = i * TinySCF->nbasfuncs + j;
-			double x = TinySCF->Hcore_mat[idx];
-			if (x >= 0.0) printf(" ");
-			printf("%.7lf\t", x);
-		}
-		printf("\n");
-	}
-	printf("\n");
+	//print_mat(TinySCF->Ovlp_mat,  TinySCF->nbasfuncs, TinySCF->nbasfuncs, TinySCF->nbasfuncs, "Overlap mat");
+	//print_mat(TinySCF->Hcore_mat, TinySCF->nbasfuncs, TinySCF->nbasfuncs, TinySCF->nbasfuncs, "Hcore mat");
 }
 
 void free_TinySCF(TinySCF_t TinySCF)
@@ -182,6 +143,9 @@ void free_TinySCF(TinySCF_t TinySCF)
 	ALIGN64B_FREE(TinySCF->Hcore_mat);
 	ALIGN64B_FREE(TinySCF->Ovlp_mat);
 	ALIGN64B_FREE(TinySCF->Fock_mat);
+	ALIGN64B_FREE(TinySCF->Dens_mat);
+	ALIGN64B_FREE(TinySCF->J_mat);
+	ALIGN64B_FREE(TinySCF->K_mat);
 	ALIGN64B_FREE(TinySCF->prev_Fock);
 	ALIGN64B_FREE(TinySCF->shell_bf_sind);
 	ALIGN64B_FREE(TinySCF->shell_bf_num);

@@ -14,12 +14,15 @@ LIBS           = ${BLAS_LIBS} ${LIBCINT_LIB} ${ERI_LIB}
 CFLAGS         = -Wall -g -O3 -qopenmp -std=gnu99 -xHost
 LDFLAGS        = -L${LIBCINT_LIB}
 
-OBJS = main.o TinySCF.o
+OBJS = utils.o TinySCF.o main.o 
 
 $(EXE): Makefile $(OBJS) ${LIBCINT_LIB} ${ERI_LIB}
 	$(CC) ${CFLAGS} ${LDFLAGS} $(OBJS) -o $(EXE) ${LIBS}
 
-TinySCF.o: Makefile TinySCF.c TinySCF.h
+utils.o: Makefile utils.c utils.h
+	$(CC) ${CFLAGS} ${INCS} -c utils.c   -o $@ 
+	
+TinySCF.o: Makefile TinySCF.c TinySCF.h utils.h
 	$(CC) ${CFLAGS} ${INCS} -c TinySCF.c -o $@ 
 	
 main.o: Makefile main.c TinySCF.h
