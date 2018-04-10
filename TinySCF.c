@@ -18,8 +18,15 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 {
 	assert(TinySCF != NULL);
 	
+	double st = get_wtime_sec();
+	
 	TinySCF->nthreads = omp_get_max_threads();
-	TinySCF->mem_size = 0;
+	
+	// Reset statistic info
+	TinySCF->mem_size       = 0.0;
+	TinySCF->init_time      = 0.0;
+	TinySCF->S_Hcore_time   = 0.0;
+	TinySCF->shell_scr_time = 0.0;
 	
 	// Load basis set and molecule from input
 	BasisSet_t _basis;
@@ -45,7 +52,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	printf("    # basis functions = %d\n", TinySCF->nbasfuncs);
 	
 	// Set screening thresholds
-	TinySCF->shell_screen_tol2 = 1e-11 * 1e-11;
+	TinySCF->shell_scrtol2 = 1e-11 * 1e-11;
 	
 	// Allocate memory for matrices
 	TinySCF->Hcore_mat   = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
@@ -68,12 +75,12 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 
 	// Allocate memory for all shells' basis function info
 	TinySCF->num_uniq_sp   = (TinySCF->nshells + 1) * TinySCF->nshells / 2;
-	TinySCF->sp_scr_vals   = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nshellpairs);
+	TinySCF->sp_scrval     = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nshellpairs);
 	TinySCF->shell_bf_sind = (int*)    ALIGN64B_MALLOC(INT_SIZE * (TinySCF->nshells + 1));
 	TinySCF->shell_bf_num  = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshells);
 	TinySCF->uniq_sp_lid   = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->num_uniq_sp);
 	TinySCF->uniq_sp_rid   = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->num_uniq_sp);
-	assert(TinySCF->sp_scr_vals   != NULL);
+	assert(TinySCF->sp_scrval     != NULL);
 	assert(TinySCF->shell_bf_sind != NULL);
 	assert(TinySCF->shell_bf_num  != NULL);
 	assert(TinySCF->uniq_sp_lid   != NULL);
@@ -90,13 +97,19 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	// Initialize Simint object
 	CInt_createSIMINT(TinySCF->basis, &(TinySCF->simint), TinySCF->nthreads);
 	
+	double et = get_wtime_sec();
+	TinySCF->init_time = et - st;
+	
 	// Print memory usage
-	printf("TinySCF initialization over, memory usage: %.2lf MB\n", (double) TinySCF->mem_size / 1048576.0);
+	printf("TinySCF initialization over, memory usage: %.2lf MB, ", TinySCF->mem_size / 1048576.0);
+	printf("time elapsed = %.2lf (s)\n", TinySCF->init_time);
 }
 
 void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 {
 	assert(TinySCF != NULL);
+	
+	double st = get_wtime_sec();
 	
 	// Compute core Hamiltonian and overlap matrix
 	memset(TinySCF->Hcore_mat, 0, DBL_SIZE * TinySCF->mat_size);
@@ -112,8 +125,8 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 			double *S_mat_ptr      = TinySCF->S_mat     + mat_topleft_offset;
 			double *Hcore_mat_ptr  = TinySCF->Hcore_mat + mat_topleft_offset;
 			
-			int nrows = TinySCF->shell_bf_sind[M + 1] - TinySCF->shell_bf_sind[M];
-			int ncols = TinySCF->shell_bf_sind[N + 1] - TinySCF->shell_bf_sind[N];
+			int nrows = TinySCF->shell_bf_num[M];
+			int ncols = TinySCF->shell_bf_num[N];
 			
 			// Compute the contribution of current shell pair to core Hamiltonian matrix
 			CInt_computePairOvl_SIMINT(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
@@ -149,10 +162,21 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 	ALIGN64B_FREE(U_mat);
 	ALIGN64B_FREE(U_mat0);
 	ALIGN64B_FREE(eigval);
+	
+	double et = get_wtime_sec();
+	TinySCF->S_Hcore_time = et - st;
+	
+	// Print runtime
+	printf("TinySCF precompute Hcore, S, and X matrices over,   ");
+	printf("time elapsed = %.2lf (s)\n", TinySCF->S_Hcore_time);
 }
 
 void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 {
+	assert(TinySCF != NULL);
+	
+	double st = get_wtime_sec();
+	
 	// Compute screening values using Schwarz inequality
 	double global_max_scrval = 0.0;
 	for (int M = 0; M < TinySCF->nshells; M++)
@@ -173,23 +197,55 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 				for (int iM = 0; iM < dimM; iM++)
 					for (int iN = 0; iN < dimN; iN++)
 					{
-						int index = iN * (dimM*dimN*dimM+dimM) + iM * (dimN*dimM+1); // Simint layout
+						int index = iN * (dimM * dimN * dimM + dimM) + iM * (dimN * dimM + 1); // Simint layout
 						double val = fabs(integrals[index]);
 						if (val > maxval) maxval = val;
 					}
 			}
-			TinySCF->sp_scr_vals[M * TinySCF->nshells + N] = maxval;
+			TinySCF->sp_scrval[M * TinySCF->nshells + N] = maxval;
 			if (maxval > global_max_scrval) global_max_scrval = maxval;
 		}
 	}
+	TinySCF->max_scrval = global_max_scrval;
 	
+	// Generate unique shell pairs that survive Schwarz screening
+	// eta is the threshold for screening a shell pair
+	double eta = TinySCF->shell_scrtol2 / TinySCF->max_scrval;
+	int nnz = 0;
+	for (int M = 0; M < TinySCF->nshells; M++)
+	{
+		for (int N = 0; N < TinySCF->nshells; N++)
+		{
+			double sp_scrval = TinySCF->sp_scrval[M * TinySCF->nshells + N];
+			// if sp_scrval * max_scrval < shell_scrtol2, for any given shell pair
+			// (P,Q), (MN|PQ) is always < shell_scrtol2 and will be screened
+			if (sp_scrval > eta)  
+			{
+				// Symmetric uniqueness check, from GTFock, not so sure about the mechanism...
+				if ((M > N) && ((M + N) % 2 == 1)) continue;
+				if ((M < N) && ((M + N) % 2 == 0)) continue;
+				
+				TinySCF->uniq_sp_lid[nnz] = M;
+				TinySCF->uniq_sp_rid[nnz] = N;
+				nnz++;
+			}
+		}
+	}
+	TinySCF->num_uniq_sp = nnz;
+	
+	double et = get_wtime_sec();
+	TinySCF->shell_scr_time = et - st;
+	
+	// Print runtime
+	printf("TinySCF precompute shell screening info over,       ");
+	printf("time elapsed = %.2lf (s)\n", TinySCF->shell_scr_time);
 }
 
 void free_TinySCF(TinySCF_t TinySCF)
 {
 	assert(TinySCF != NULL);
 	
-	ALIGN64B_FREE(TinySCF->sp_scr_vals);
+	ALIGN64B_FREE(TinySCF->sp_scrval);
 	ALIGN64B_FREE(TinySCF->Hcore_mat);
 	ALIGN64B_FREE(TinySCF->S_mat);
 	ALIGN64B_FREE(TinySCF->F_mat);

@@ -18,8 +18,8 @@ struct TinySCF_struct
 	int charge, nshellpairs, mat_size, n_occ;
 	
 	// Shell quartet screening 
-	double shell_screen_tol2, max_scrval;
-	double *sp_scr_vals;  // Square of screening values (upper bound) of each shell pair
+	double shell_scrtol2, max_scrval;
+	double *sp_scrval;    // Square of screening values (upper bound) of each shell pair
 	int    *uniq_sp_lid;  // Left shell id of all unique shell pairs
 	int    *uniq_sp_rid;  // Right shell id of all unique shell pairs
 	int    num_uniq_sp;   // Number of unique shell pairs (== nshells * (nshells+1) / 2)
@@ -40,7 +40,7 @@ struct TinySCF_struct
 	double *prev_F_mat;  // Previous Fock matrices, for DIIS
 	
 	// Statistic 
-	double mem_size;
+	double mem_size, init_time, S_Hcore_time, shell_scr_time;
 };
 
 typedef struct TinySCF_struct* TinySCF_t;
