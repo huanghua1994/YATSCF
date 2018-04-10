@@ -29,6 +29,8 @@ int main(int argc, char **argv)
 	TinySCF_compute_Hcore_Ovlp_mat(TinySCF);
 	TinySCF_compute_sq_Schwarz_scrvals(TinySCF);
 	
+	TinySCF_do_SCF(TinySCF);
+	
 	free_TinySCF(TinySCF);
 	
 	return 0;

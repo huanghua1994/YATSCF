@@ -14,8 +14,12 @@ struct TinySCF_struct
 	
 	// Problem info
 	BasisSet_t basis;
-	int niters, natoms, nshells, nbasfuncs;
-	int charge, nshellpairs, mat_size, n_occ;
+	int niters, natoms, nshells, nbasfuncs, n_occ;
+	int charge, nshellpairs, mat_size;
+	
+	// SCF iteration info
+	double energy, nuc_energy, energy_delta_tol;
+	int iter;
 	
 	// Shell quartet screening 
 	double shell_scrtol2, max_scrval;
@@ -55,6 +59,9 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF);
 // Compute the screening values of each shell quartet and the unique shell pairs
 // that survive screening using Schwarz inequality
 void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF);
+
+// Perform SCF calculation
+void TinySCF_do_SCF(TinySCF_t TinySCF);
 
 // Destroy TinySCF 
 void free_TinySCF(TinySCF_t TinySCF);
