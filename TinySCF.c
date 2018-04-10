@@ -7,11 +7,6 @@
 #include "TinySCF.h"
 #include "utils.h"
 
-#define ALIGN64B_MALLOC(x) _mm_malloc((x), 64)
-#define ALIGN64B_FREE(x)   _mm_free(x)
-#define DBL_SIZE           sizeof(double)
-#define INT_SIZE           sizeof(int)
-
 void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int niters)
 {
 	assert(TinySCF != NULL);
@@ -53,6 +48,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->Dens_mat    = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
 	TinySCF->J_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
 	TinySCF->K_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
+	TinySCF->X_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
 	TinySCF->prev_Fock   = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size * MAX_DIIS);
 	assert(TinySCF->sp_scr_vals   != NULL);
 	assert(TinySCF->Hcore_mat     != NULL);
@@ -61,8 +57,9 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	assert(TinySCF->Dens_mat      != NULL);
 	assert(TinySCF->J_mat         != NULL);
 	assert(TinySCF->K_mat         != NULL);
+	assert(TinySCF->X_mat         != NULL);
 	assert(TinySCF->prev_Fock     != NULL);
-	TinySCF->mem_size += DBL_SIZE * (TinySCF->nshellpairs + (MAX_DIIS + 6) * TinySCF->mat_size);
+	TinySCF->mem_size += DBL_SIZE * (TinySCF->nshellpairs + (MAX_DIIS + 7) * TinySCF->mat_size);
 
 	// Allocate memory for all shells' basis function info
 	TinySCF->shell_bf_sind = (int*) ALIGN64B_MALLOC(INT_SIZE * (TinySCF->nshells + 1));
@@ -83,21 +80,6 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	// Print memory usage
 	printf("TinySCF initialization over, memory usage: %.2lf MB\n", (double) TinySCF->mem_size / 1048576.0);
 }
-
-static void copy_matrix_block(
-	double *dst, const int ldd, double *src, const int lds, 
-	const int nrows, const int ncols
-)
-{
-	for (int irow = 0; irow < nrows; irow++)
-	{
-		double *dst_ptr = dst + irow * ldd;
-		double *src_ptr = src + irow * lds;
-		#pragma simd
-		for (int icol = 0; icol < ncols; icol++)
-			dst_ptr[icol] = src_ptr[icol];
-	}
-} 
 
 void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 {
@@ -146,6 +128,7 @@ void free_TinySCF(TinySCF_t TinySCF)
 	ALIGN64B_FREE(TinySCF->Dens_mat);
 	ALIGN64B_FREE(TinySCF->J_mat);
 	ALIGN64B_FREE(TinySCF->K_mat);
+	ALIGN64B_FREE(TinySCF->X_mat);
 	ALIGN64B_FREE(TinySCF->prev_Fock);
 	ALIGN64B_FREE(TinySCF->shell_bf_sind);
 	ALIGN64B_FREE(TinySCF->shell_bf_num);

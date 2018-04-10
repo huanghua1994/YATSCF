@@ -33,6 +33,7 @@ struct TinySCF_struct
 	double *Dens_mat;     // Density matrix
 	double *J_mat;        // Coulomb matrix
 	double *K_mat;        // Exchange matrix
+	double *X_mat;        // Exchange matrix
 	double *prev_Fock;    // Previous Fock matrices, for DIIS
 	
 	// Statistic 
