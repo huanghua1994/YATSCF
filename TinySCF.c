@@ -313,6 +313,17 @@ static void TinySCF_get_initial_guess(TinySCF_t TinySCF)
 {
 	// TODO: use CInt_getInitialGuess() to get initial guess
 	memset(TinySCF->D_mat, 0, DBL_SIZE * TinySCF->mat_size);
+	
+	double *guess;
+	int spos, epos, ldg;
+	int nbf = TinySCF->nbasfuncs;
+	for (int i = 0; i < TinySCF->natoms; i++)
+	{
+		CInt_getInitialGuess(TinySCF->basis, i, &guess, &spos, &epos);
+		ldg = epos - spos + 1;
+		double *D_mat_ptr = TinySCF->D_mat + spos * nbf + spos;
+		copy_matrix_block(D_mat_ptr, nbf, guess, ldg, ldg, ldg);
+	}
 }
 
 void TinySCF_calc_energy(TinySCF_t TinySCF)
@@ -329,6 +340,8 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 {
 	// Get initial guess for density matrix
 	TinySCF_get_initial_guess(TinySCF);
+	
+	print_mat(TinySCF->D_mat, TinySCF->nbasfuncs, TinySCF->nbasfuncs, TinySCF->nbasfuncs, "Init D mat");
 	
 	// Calculate nuclear energy
 	TinySCF->nuc_energy = CInt_getNucEnergy(TinySCF->basis);
@@ -357,6 +370,8 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		et1 = get_wtime_sec();
 		printf("* DIIS procedure        : %.2lf (s)\n", et1 - st1);
 		
+		print_mat(TinySCF->F_mat, TinySCF->nbasfuncs, TinySCF->nbasfuncs, TinySCF->nbasfuncs, "Fock mat");
+		
 		// Calculate new system energy
 		st1 = get_wtime_sec();
 		TinySCF_calc_energy(TinySCF);
@@ -381,5 +396,6 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 			TinySCF->energy, TinySCF->energy - TinySCF->nuc_energy, energy_delta, et0 - st0
 		);
 	}
+	printf("--------------- SCF iterations finished ---------------\n");
 }
 

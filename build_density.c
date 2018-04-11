@@ -72,4 +72,7 @@ void TinySCF_build_DenMat(TinySCF_t TinySCF)
 	// D = C_occ * C_occ^T
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, nbf, nbf, n_occ, 
 				1.0, Cocc_mat, n_occ, Cocc_mat, n_occ, 0.0, D_mat, nbf);
+	
+	// Recover F_mat for output
+	memcpy(F_mat, TinySCF->F0_mat + (MAX_DIIS - 1) * TinySCF->mat_size, DBL_SIZE * TinySCF->mat_size);
 }
