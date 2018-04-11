@@ -18,8 +18,10 @@ struct TinySCF_struct
 	int charge, nshellpairs, mat_size;
 	
 	// SCF iteration info
-	double energy, nuc_energy, energy_delta_tol;
 	int iter;
+	double nuc_energy, energy;   // Nuclear energy and total energy
+	double energy_delta_tol;     // SCF termination criteria for energy change
+	
 	
 	// Shell quartet screening 
 	double shell_scrtol2, max_scrval;
@@ -28,20 +30,24 @@ struct TinySCF_struct
 	int    *uniq_sp_rid;  // Right shell id of all unique shell pairs
 	int    num_uniq_sp;   // Number of unique shell pairs (== nshells * (nshells+1) / 2)
 	
-	// Integrals
+	// ERIs
 	SIMINT_t simint;
 	int *shell_bf_sind;   // Index of the first basis function of each shell
 	int *shell_bf_num;    // Number of basis function in each shell
 	
 	// Matrices
-	double *Hcore_mat;   // Core Hamiltonian matrix
-	double *S_mat;       // Overlap matrix
-	double *F_mat;       // Fock matrix
-	double *D_mat;       // Density matrix
-	double *J_mat;       // Coulomb matrix
-	double *K_mat;       // Exchange matrix
-	double *X_mat;       // Basis transformation matrix
-	double *prev_F_mat;  // Previous Fock matrices, for DIIS
+	double *Hcore_mat;    // Core Hamiltonian matrix
+	double *S_mat;        // Overlap matrix, no longer needed once X_mat is obtained
+	double *F_mat;        // Fock matrix
+	double *D_mat;        // Density matrix
+	double *J_mat;        // Coulomb matrix
+	double *K_mat;        // Exchange matrix
+	double *X_mat;        // Basis transformation matrix
+	double *prev_F_mat;   // Previous Fock matrices, for DIIS
+	double *Cocc_mat;     // Temporary matrix for building density matrix
+	
+	double *eigval;       // Eigenvalues for building density matrix
+	int    *ev_idx;       // Index of eigenvalues, for sorting
 	
 	// Statistic 
 	double mem_size, init_time, S_Hcore_time, shell_scr_time;

@@ -32,7 +32,6 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->shell_scr_time = 0.0;
 	
 	// Load basis set and molecule from input
-	BasisSet_t _basis;
 	CInt_createBasisSet(&(TinySCF->basis));
 	CInt_loadBasisSet(TinySCF->basis, bas_fname, xyz_fname);
 	
@@ -41,7 +40,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->nshells     = CInt_getNumShells  (TinySCF->basis);
 	TinySCF->nbasfuncs   = CInt_getNumFuncs   (TinySCF->basis);
 	TinySCF->charge      = CInt_getTotalCharge(TinySCF->basis);
-	TinySCF->n_occ       = CInt_getNumOccOrb(TinySCF->basis);
+	TinySCF->n_occ       = CInt_getNumOccOrb  (TinySCF->basis);
 	TinySCF->niters      = niters;
 	TinySCF->nshellpairs = TinySCF->nshells   * TinySCF->nshells;
 	TinySCF->mat_size    = TinySCF->nbasfuncs * TinySCF->nbasfuncs;
@@ -61,14 +60,15 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->energy_delta_tol = 1e-10;
 	
 	// Allocate memory for matrices
-	TinySCF->Hcore_mat   = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
-	TinySCF->S_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
-	TinySCF->F_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
-	TinySCF->D_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
-	TinySCF->J_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
-	TinySCF->K_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
-	TinySCF->X_mat       = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
-	TinySCF->prev_F_mat  = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size * MAX_DIIS);
+	int mat_mem_size = DBL_SIZE * TinySCF->mat_size;
+	TinySCF->Hcore_mat   = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->S_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->F_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->D_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->J_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->K_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->X_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->prev_F_mat  = (double*) ALIGN64B_MALLOC(mat_mem_size * MAX_DIIS);
 	assert(TinySCF->Hcore_mat     != NULL);
 	assert(TinySCF->S_mat         != NULL);
 	assert(TinySCF->F_mat         != NULL);
@@ -77,8 +77,18 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	assert(TinySCF->K_mat         != NULL);
 	assert(TinySCF->X_mat         != NULL);
 	assert(TinySCF->prev_F_mat    != NULL);
-	TinySCF->mem_size += DBL_SIZE * (MAX_DIIS + 7) * TinySCF->mat_size;
+	TinySCF->mem_size += (MAX_DIIS + 7) * mat_mem_size;
 
+	// Allocate memory for temporary arrays in building density matrix
+	TinySCF->Cocc_mat    = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->n_occ * TinySCF->nbasfuncs);
+	TinySCF->eigval      = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nbasfuncs);
+	TinySCF->ev_idx      = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nbasfuncs);
+	assert(TinySCF->Cocc_mat      != NULL);
+	assert(TinySCF->eigval        != NULL);
+	assert(TinySCF->eigval        != NULL);
+	TinySCF->mem_size += DBL_SIZE * (TinySCF->n_occ + 1) * TinySCF->nbasfuncs;
+	TinySCF->mem_size += INT_SIZE * TinySCF->nbasfuncs;
+	
 	// Allocate memory for all shells' basis function info
 	TinySCF->num_uniq_sp   = (TinySCF->nshells + 1) * TinySCF->nshells / 2;
 	TinySCF->sp_scrval     = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nshellpairs);
@@ -91,8 +101,9 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	assert(TinySCF->shell_bf_num  != NULL);
 	assert(TinySCF->uniq_sp_lid   != NULL);
 	assert(TinySCF->uniq_sp_rid   != NULL);
-	TinySCF->mem_size += DBL_SIZE * TinySCF->nshellpairs + INT_SIZE * (2 * TinySCF->nshells + 1) 
-					   + INT_SIZE * 2 * TinySCF->num_uniq_sp;
+	TinySCF->mem_size += DBL_SIZE * TinySCF->nshellpairs;
+	TinySCF->mem_size += INT_SIZE * (2 * TinySCF->nshells + 1);
+	TinySCF->mem_size += INT_SIZE * 2 * TinySCF->num_uniq_sp;
 	for (int i = 0; i < TinySCF->nshells; i++)
 	{
 		TinySCF->shell_bf_sind[i] = CInt_getFuncStartInd(TinySCF->basis, i);
@@ -109,6 +120,36 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	// Print memory usage
 	printf("TinySCF initialization over, memory usage: %.2lf MB, ", TinySCF->mem_size / 1048576.0);
 	printf("time elapsed = %.2lf (s)\n", TinySCF->init_time);
+}
+
+
+void free_TinySCF(TinySCF_t TinySCF)
+{
+	assert(TinySCF != NULL);
+	
+	ALIGN64B_FREE(TinySCF->Hcore_mat);
+	ALIGN64B_FREE(TinySCF->S_mat);
+	ALIGN64B_FREE(TinySCF->F_mat);
+	ALIGN64B_FREE(TinySCF->D_mat);
+	ALIGN64B_FREE(TinySCF->J_mat);
+	ALIGN64B_FREE(TinySCF->K_mat);
+	ALIGN64B_FREE(TinySCF->X_mat);
+	ALIGN64B_FREE(TinySCF->prev_F_mat);
+	
+	ALIGN64B_FREE(TinySCF->Cocc_mat);
+	ALIGN64B_FREE(TinySCF->eigval);
+	ALIGN64B_FREE(TinySCF->ev_idx);
+	
+	ALIGN64B_FREE(TinySCF->sp_scrval);
+	ALIGN64B_FREE(TinySCF->shell_bf_sind);
+	ALIGN64B_FREE(TinySCF->shell_bf_num);
+	ALIGN64B_FREE(TinySCF->uniq_sp_lid);
+	ALIGN64B_FREE(TinySCF->uniq_sp_rid);
+	
+	CInt_destroyBasisSet(TinySCF->basis);
+	CInt_destroySIMINT(TinySCF->simint, 1);
+	
+	free(TinySCF);
 }
 
 void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
@@ -214,6 +255,10 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 	}
 	TinySCF->max_scrval = global_max_scrval;
 	
+	// Recreate Simint object to reset its statistic info
+	CInt_destroySIMINT(TinySCF->simint, 0);
+	CInt_createSIMINT(TinySCF->basis, &(TinySCF->simint), TinySCF->nthreads);
+	
 	// Generate unique shell pairs that survive Schwarz screening
 	// eta is the threshold for screening a shell pair
 	double eta = TinySCF->shell_scrtol2 / TinySCF->max_scrval;
@@ -274,54 +319,50 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 	// Start SCF iterations
 	printf("TinySCF SCF iteration started...\n");
 	TinySCF->iter = 0;
-	double prev_energy  = TinySCF->nuc_energy;
-	double energy_delta = prev_energy;
+	double prev_energy  = 0;
+	double energy_delta = 2018;
 	while ((TinySCF->iter < TinySCF->niters) && (energy_delta >= TinySCF->energy_delta_tol))
 	{
-		double st = get_wtime_sec();
+		printf("--------------- Iteration %d ---------------\n", TinySCF->iter);
+		
+		double st0, et0, st1, et1;
+		st0 = get_wtime_sec();
 		
 		// Build the Fock matrix
+		st1 = get_wtime_sec();
 		TinySCF_build_FockMat(TinySCF);
+		et1 = get_wtime_sec();
+		printf("* Build Fock matrix     : %.2lf (s)\n", et1 - st1);
 		
 		// DIIS (Pulay mixing)
+		st1 = get_wtime_sec();
 		TinySCF_DIIS(TinySCF);
+		et1 = get_wtime_sec();
+		printf("* DIIS procedure        : %.2lf (s)\n", et1 - st1);
 		
 		// Calculate new system energy
+		st1 = get_wtime_sec();
 		TinySCF_calc_energy(TinySCF);
+		et1 = get_wtime_sec();
+		printf("* Calculate energy      : %.2lf (s)\n", et1 - st1);
+		
 		energy_delta = fabs(TinySCF->energy - prev_energy);
 		prev_energy = TinySCF->energy;
 		
 		// Diagonalize and build the density matrix
+		st1 = get_wtime_sec();
 		TinySCF_build_DenMat(TinySCF);
+		et1 = get_wtime_sec();
+		printf("* Build density matrix  : %.2lf (s)\n", et1 - st1);
 		
 		TinySCF->iter++;
 		
-		double ut = get_wtime_sec() - st;
+		et0 = get_wtime_sec();
 		
 		printf(
-			"    Iter = %d, energy = %lf (%lf), delta = %lf, runtime = %.2lf (s)\n", 
-			TinySCF->iter, TinySCF->energy, TinySCF->energy - TinySCF->nuc_energy, energy_delta, ut
+			"* Energy = %.10lf (%.10lf), delta = %.10lf, iteration runtime = %.2lf (s)\n", 
+			TinySCF->energy, TinySCF->energy - TinySCF->nuc_energy, energy_delta, et0 - st0
 		);
 	}
 }
 
-void free_TinySCF(TinySCF_t TinySCF)
-{
-	assert(TinySCF != NULL);
-	
-	ALIGN64B_FREE(TinySCF->sp_scrval);
-	ALIGN64B_FREE(TinySCF->Hcore_mat);
-	ALIGN64B_FREE(TinySCF->S_mat);
-	ALIGN64B_FREE(TinySCF->F_mat);
-	ALIGN64B_FREE(TinySCF->D_mat);
-	ALIGN64B_FREE(TinySCF->J_mat);
-	ALIGN64B_FREE(TinySCF->K_mat);
-	ALIGN64B_FREE(TinySCF->X_mat);
-	ALIGN64B_FREE(TinySCF->prev_F_mat);
-	ALIGN64B_FREE(TinySCF->shell_bf_sind);
-	ALIGN64B_FREE(TinySCF->shell_bf_num);
-	ALIGN64B_FREE(TinySCF->uniq_sp_lid);
-	ALIGN64B_FREE(TinySCF->uniq_sp_rid);
-	
-	free(TinySCF);
-}
