@@ -4,6 +4,7 @@
 #include <math.h>
 #include <omp.h>
 
+#include "utils.h"
 #include "TinySCF.h"
 #include "build_Fock.h"
 
@@ -16,12 +17,12 @@ inline void unique_integral_coef(int M, int N, int P, int Q, double *coef)
 	int flag5 = ((flag1 == 1) && (flag3 == 1)) ? 1 : 0;
 	int flag6 = ((flag2 == 1) && (flag3 == 1)) ? 1 : 0;
 	int flag7 = ((flag4 == 1) && (flag3 == 1)) ? 1 : 0;
-	coef[0] = 1.0   + flag1 + flag2 + flag4;  // for J_MN
-	coef[1] = flag3 + flag5 + flag6 + flag7;  // for J_PQ
-	coef[2] = 1.0   + flag3;                  // for K_MP
-	coef[3] = flag1 + flag5;                  // for K_NP
-	coef[4] = flag2 + flag6;                  // for K_MQ
-	coef[5] = flag4 + flag7;                  // for K_NQ
+	coef[0] = 2.0 * (1.0   + flag1 + flag2 + flag4);  // for J_MN
+	coef[1] = 2.0 * (flag3 + flag5 + flag6 + flag7);  // for J_PQ
+	coef[2] = 1.0   + flag3;  // for K_MP
+	coef[3] = flag1 + flag5;  // for K_NP
+	coef[4] = flag2 + flag6;  // for K_MQ
+	coef[5] = flag4 + flag7;  // for K_NQ
 }
 
 void Accum_Fock(
@@ -70,8 +71,8 @@ void Accum_Fock(
 				{
 					double I = ERI[Ibase + iQ];
 					
-					J_MN[iM * nbf + iN] += 2.0 * coef[0] * D_PQ[iP * nbf + iQ] * I;
-					J_PQ[iP * nbf + iQ] += 2.0 * coef[1] * D_MN[iM * nbf + iN] * I;
+					J_MN[iM * nbf + iN] += coef[0] * D_PQ[iP * nbf + iQ] * I;
+					J_PQ[iP * nbf + iQ] += coef[1] * D_MN[iM * nbf + iN] * I;
 					
 					K_MP[iM * nbf + iP] -= coef[2] * D_NQ[iN * nbf + iQ] * I;
 					K_NP[iN * nbf + iP] -= coef[3] * D_MQ[iM * nbf + iQ] * I;
@@ -121,8 +122,8 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 	double *D_mat      = TinySCF->D_mat;
 	double *Hcore_mat  = TinySCF->Hcore_mat;
 	
-	memset(J_mat, 0, sizeof(double) * TinySCF->mat_size);
-	memset(K_mat, 0, sizeof(double) * TinySCF->mat_size);
+	memset(J_mat, 0, DBL_SIZE * TinySCF->mat_size);
+	memset(K_mat, 0, DBL_SIZE * TinySCF->mat_size);
 	
 	for (int MN = 0; MN < num_uniq_sp; MN++)
 	{

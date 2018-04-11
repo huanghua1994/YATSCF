@@ -5,6 +5,7 @@
 
 #include <mkl.h>
 
+#include "utils.h"
 #include "TinySCF.h"
 #include "build_density.h"
 
@@ -56,7 +57,7 @@ void TinySCF_build_DenMat(TinySCF_t TinySCF)
 				
 	// Diagonalize F1 = C0^T * epsilon * C0, and C = X * C0 
 	// [C0, E] = eig(F1), now C0 is stored in F_mat
-	LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', nbf, F_mat, nbf, eigval); 
+	LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', nbf, F_mat, nbf, eigval);  // F_mat will be overwritten by eigenvectors
 	// C = X * C0, now C is stored in C_mat
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
 				1.0, X_mat, nbf, F_mat, nbf, 0.0, C_mat, nbf);

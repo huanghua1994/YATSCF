@@ -59,35 +59,50 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	// Set SCF iteration termination criteria 
 	TinySCF->energy_delta_tol = 1e-10;
 	
-	// Allocate memory for matrices
-	int mat_mem_size = DBL_SIZE * TinySCF->mat_size;
-	TinySCF->Hcore_mat   = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->S_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->F_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->D_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->J_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->K_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->X_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->prev_F_mat  = (double*) ALIGN64B_MALLOC(mat_mem_size * MAX_DIIS);
-	assert(TinySCF->Hcore_mat     != NULL);
-	assert(TinySCF->S_mat         != NULL);
-	assert(TinySCF->F_mat         != NULL);
-	assert(TinySCF->D_mat         != NULL);
-	assert(TinySCF->J_mat         != NULL);
-	assert(TinySCF->K_mat         != NULL);
-	assert(TinySCF->X_mat         != NULL);
-	assert(TinySCF->prev_F_mat    != NULL);
-	TinySCF->mem_size += (MAX_DIIS + 7) * mat_mem_size;
+	// Allocate memory for matrices and temporary arrays used in SCF
+	int mat_mem_size   = DBL_SIZE * TinySCF->mat_size;
+	TinySCF->Hcore_mat = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->S_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->F_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->D_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->J_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->K_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->X_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->Cocc_mat  = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->n_occ * TinySCF->nbasfuncs);
+	TinySCF->eigval    = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nbasfuncs);
+	TinySCF->ev_idx    = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nbasfuncs);
+	assert(TinySCF->Hcore_mat != NULL);
+	assert(TinySCF->S_mat     != NULL);
+	assert(TinySCF->F_mat     != NULL);
+	assert(TinySCF->D_mat     != NULL);
+	assert(TinySCF->J_mat     != NULL);
+	assert(TinySCF->K_mat     != NULL);
+	assert(TinySCF->X_mat     != NULL);
+	assert(TinySCF->Cocc_mat  != NULL);
+	assert(TinySCF->eigval    != NULL);
+	assert(TinySCF->eigval    != NULL);
+	TinySCF->mem_size += 7 * mat_mem_size;
+	TinySCF->mem_size += DBL_SIZE * TinySCF->n_occ * TinySCF->nbasfuncs;
+	TinySCF->mem_size += (DBL_SIZE + INT_SIZE) * TinySCF->nbasfuncs;
 
-	// Allocate memory for temporary arrays in building density matrix
-	TinySCF->Cocc_mat    = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->n_occ * TinySCF->nbasfuncs);
-	TinySCF->eigval      = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nbasfuncs);
-	TinySCF->ev_idx      = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nbasfuncs);
-	assert(TinySCF->Cocc_mat      != NULL);
-	assert(TinySCF->eigval        != NULL);
-	assert(TinySCF->eigval        != NULL);
-	TinySCF->mem_size += DBL_SIZE * (TinySCF->n_occ + 1) * TinySCF->nbasfuncs;
-	TinySCF->mem_size += INT_SIZE * TinySCF->nbasfuncs;
+	// Allocate memory for matrices and temporary arrays used in DIIS
+	int DIIS_row_memsize = DBL_SIZE * (MAX_DIIS + 1);
+	TinySCF->F0_mat    = (double*) ALIGN64B_MALLOC(mat_mem_size * MAX_DIIS);
+	TinySCF->R_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size * MAX_DIIS);
+	TinySCF->B_mat     = (double*) ALIGN64B_MALLOC(DIIS_row_memsize * (MAX_DIIS + 1));
+	TinySCF->DIIS_rhs  = (double*) ALIGN64B_MALLOC(DIIS_row_memsize);
+	TinySCF->DIIS_ipiv = (int*)    ALIGN64B_MALLOC(INT_SIZE * (MAX_DIIS + 1));
+	assert(TinySCF->F0_mat    != NULL);
+	assert(TinySCF->R_mat     != NULL);
+	assert(TinySCF->B_mat     != NULL);
+	assert(TinySCF->DIIS_rhs  != NULL);
+	assert(TinySCF->DIIS_ipiv != NULL);
+	TinySCF->mem_size += MAX_DIIS * 2 * mat_mem_size;
+	TinySCF->mem_size += DIIS_row_memsize * (MAX_DIIS + 2);
+	TinySCF->mem_size += INT_SIZE * (MAX_DIIS + 1);
+	// Must initialize F0 and R as 0 
+	memset(TinySCF->F0_mat, 0, mat_mem_size * MAX_DIIS);
+	memset(TinySCF->R_mat,  0, mat_mem_size * MAX_DIIS);
 	
 	// Allocate memory for all shells' basis function info
 	TinySCF->num_uniq_sp   = (TinySCF->nshells + 1) * TinySCF->nshells / 2;
@@ -127,6 +142,7 @@ void free_TinySCF(TinySCF_t TinySCF)
 {
 	assert(TinySCF != NULL);
 	
+	// Free matrices and temporary arrays used in SCF
 	ALIGN64B_FREE(TinySCF->Hcore_mat);
 	ALIGN64B_FREE(TinySCF->S_mat);
 	ALIGN64B_FREE(TinySCF->F_mat);
@@ -134,18 +150,25 @@ void free_TinySCF(TinySCF_t TinySCF)
 	ALIGN64B_FREE(TinySCF->J_mat);
 	ALIGN64B_FREE(TinySCF->K_mat);
 	ALIGN64B_FREE(TinySCF->X_mat);
-	ALIGN64B_FREE(TinySCF->prev_F_mat);
-	
 	ALIGN64B_FREE(TinySCF->Cocc_mat);
 	ALIGN64B_FREE(TinySCF->eigval);
 	ALIGN64B_FREE(TinySCF->ev_idx);
 	
+	// Free matrices and temporary arrays used in DIIS
+	ALIGN64B_FREE(TinySCF->F0_mat);
+	ALIGN64B_FREE(TinySCF->R_mat);
+	ALIGN64B_FREE(TinySCF->B_mat);
+	ALIGN64B_FREE(TinySCF->DIIS_rhs);
+	ALIGN64B_FREE(TinySCF->DIIS_ipiv);
+	
+	// Free arrays for all shells' basis function info
 	ALIGN64B_FREE(TinySCF->sp_scrval);
 	ALIGN64B_FREE(TinySCF->shell_bf_sind);
 	ALIGN64B_FREE(TinySCF->shell_bf_num);
 	ALIGN64B_FREE(TinySCF->uniq_sp_lid);
 	ALIGN64B_FREE(TinySCF->uniq_sp_rid);
 	
+	// Free BasisSet_t and SIMINT_t object, require SIMINT_t object print stat info
 	CInt_destroyBasisSet(TinySCF->basis);
 	CInt_destroySIMINT(TinySCF->simint, 1);
 	
@@ -187,13 +210,11 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 	
 	// Construct basis transformation 
 	int N = TinySCF->nbasfuncs;
-	double *U_mat  = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
-	double *U_mat0 = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->mat_size);
-	double *eigval = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nbasfuncs);
-	assert(U_mat != NULL && eigval != NULL);
-	memcpy(U_mat, TinySCF->S_mat, DBL_SIZE * TinySCF->mat_size);
+	double *U_mat  = TinySCF->S_mat;  // We don't need S_mat matrix any more
+	double *U_mat0 = TinySCF->K_mat;  // K_mat is not used currently, use it as a temporary matrix
+	double *eigval = TinySCF->eigval;
 	// [U, D] = eig(S);
-	LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', N, U_mat, N, eigval); 
+	LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', N, U_mat, N, eigval); // U_mat will be overwritten by eigenvectors
 	// X = U * D^{-1/2} * U'
 	memcpy(U_mat0, U_mat, DBL_SIZE * TinySCF->mat_size);
 	for (int i = 0; i < N; i++) 
@@ -205,10 +226,6 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 			U_mat0[i * N + j] *= eigval[j];
 	}
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, N, N, N, 1.0, U_mat0, N, U_mat, N, 0.0, TinySCF->X_mat, N);
-	
-	ALIGN64B_FREE(U_mat);
-	ALIGN64B_FREE(U_mat0);
-	ALIGN64B_FREE(eigval);
 	
 	double et = get_wtime_sec();
 	TinySCF->S_Hcore_time = et - st;
@@ -360,7 +377,7 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		et0 = get_wtime_sec();
 		
 		printf(
-			"* Energy = %.10lf (%.10lf), delta = %.10lf, iteration runtime = %.2lf (s)\n", 
+			"* Energy = %.10lf (%.10lf), delta = %e, iteration runtime = %.2lf (s)\n", 
 			TinySCF->energy, TinySCF->energy - TinySCF->nuc_energy, energy_delta, et0 - st0
 		);
 	}
