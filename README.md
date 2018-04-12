@@ -18,6 +18,6 @@ Current status:
 
 ![](https://img.shields.io/badge/OpenMP%20parallelization-ready-brightgreen.svg)
 
-![](https://img.shields.io/badge/ERI%20batching-not%20ready-red.svg)
+![](https://img.shields.io/badge/ERI%20batching-ready-brightgreen.svg)
 
 ![](https://img.shields.io/badge/Fock%20accum.%20opt.-not%20ready-red.svg)

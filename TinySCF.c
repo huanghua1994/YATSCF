@@ -24,6 +24,8 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	
 	double st = get_wtime_sec();
 	
+	TinySCF->mem_size = 0.0;
+	
 	// Initialize OpenMP parallel info and buffer
 	TinySCF->nthreads = omp_get_max_threads();
 	
@@ -129,7 +131,6 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	memset(TinySCF->R_mat,  0, mat_mem_size * MAX_DIIS);
 
 	// Reset statistic info
-	TinySCF->mem_size       = 0.0;
 	TinySCF->init_time      = 0.0;
 	TinySCF->S_Hcore_time   = 0.0;
 	TinySCF->shell_scr_time = 0.0;

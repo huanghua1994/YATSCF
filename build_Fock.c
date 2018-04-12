@@ -7,6 +7,7 @@
 #include "utils.h"
 #include "TinySCF.h"
 #include "build_Fock.h"
+#include "shell_quartet_list.h"
 
 static inline void atomic_add_f64(volatile double *global_value, double addend)
 {
@@ -36,32 +37,32 @@ static inline void unique_integral_coef(int M, int N, int P, int Q, double *coef
 }
 
 void Accum_Fock(
-	double *J_mat, double *K_mat, double *D_mat, double *ERI, int tid, 
-	int nbf, int M, int N, int P, int Q, int *shell_bf_num, int *shell_bf_sind
+	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI
 )
 {
-	int dimM = shell_bf_num[M];
-	int dimN = shell_bf_num[N];
-	int dimP = shell_bf_num[P];
-	int dimQ = shell_bf_num[Q];
-	int idxM = shell_bf_sind[M];
-	int idxN = shell_bf_sind[N];
-	int idxP = shell_bf_sind[P];
-	int idxQ = shell_bf_sind[Q];
+	int nbf  = TinySCF->nbasfuncs;
+	int dimM = TinySCF->shell_bf_num[M];
+	int dimN = TinySCF->shell_bf_num[N];
+	int dimP = TinySCF->shell_bf_num[P];
+	int dimQ = TinySCF->shell_bf_num[Q];
+	int idxM = TinySCF->shell_bf_sind[M];
+	int idxN = TinySCF->shell_bf_sind[N];
+	int idxP = TinySCF->shell_bf_sind[P];
+	int idxQ = TinySCF->shell_bf_sind[Q];
 	
-	double *J_MN = J_mat + idxM * nbf + idxN;
-	double *J_PQ = J_mat + idxP * nbf + idxQ;
-	double *K_MP = K_mat + idxM * nbf + idxP;
-	double *K_NP = K_mat + idxN * nbf + idxP;
-	double *K_MQ = K_mat + idxM * nbf + idxQ;
-	double *K_NQ = K_mat + idxN * nbf + idxQ;
+	double *J_MN = TinySCF->J_mat + idxM * nbf + idxN;
+	double *J_PQ = TinySCF->J_mat + idxP * nbf + idxQ;
+	double *K_MP = TinySCF->K_mat + idxM * nbf + idxP;
+	double *K_NP = TinySCF->K_mat + idxN * nbf + idxP;
+	double *K_MQ = TinySCF->K_mat + idxM * nbf + idxQ;
+	double *K_NQ = TinySCF->K_mat + idxN * nbf + idxQ;
 	
-	double *D_MN = D_mat + idxM * nbf + idxN;
-	double *D_PQ = D_mat + idxP * nbf + idxQ;
-	double *D_MP = D_mat + idxM * nbf + idxP;
-	double *D_NP = D_mat + idxN * nbf + idxP;
-	double *D_MQ = D_mat + idxM * nbf + idxQ;
-	double *D_NQ = D_mat + idxN * nbf + idxQ;
+	double *D_MN = TinySCF->D_mat + idxM * nbf + idxN;
+	double *D_PQ = TinySCF->D_mat + idxP * nbf + idxQ;
+	double *D_MP = TinySCF->D_mat + idxM * nbf + idxP;
+	double *D_NP = TinySCF->D_mat + idxN * nbf + idxP;
+	double *D_MQ = TinySCF->D_mat + idxM * nbf + idxQ;
+	double *D_NQ = TinySCF->D_mat + idxN * nbf + idxQ;
 	
 	double coef[7];
 	unique_integral_coef(M, N, P, Q, coef);
@@ -103,6 +104,21 @@ void Accum_Fock(
 			atomic_add_f64(&J_MN[iMN], j_MN);
 		} // for (int iQ = 0; iQ < dimQ; iQ++) 
 	} // for (int iN = 0; iN < dimN; iN++)
+}
+
+void Accum_Fock_with_KetshellpairList(
+	TinySCF_t TinySCF, int tid, int M, int N, 
+	int *P_list, int *Q_list, int npairs, 
+	double *thread_eris, int thread_nints
+)
+{
+	for (int ipair = 0; ipair < npairs; ipair++)
+	{
+		Accum_Fock(
+			TinySCF, tid, M, N, P_list[ipair], Q_list[ipair], 
+			thread_eris + ipair * thread_nints
+		);
+	}
 }
 
 // F = H_core + (J + J^T) / 2 + (K + K^T) / 2;
@@ -149,6 +165,15 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 	#pragma omp parallel
 	{
 		int tid = omp_get_thread_num();
+		
+		// Create ERI batching auxiliary data structures
+		// Ket-side shell pair lists that needs to be computed
+		ThreadKetShellpairLists_t thread_ksp_lists;
+		create_ThreadKetShellpairLists(&thread_ksp_lists);
+		// Simint multi_shellpair buffer for batched ERI computation
+        void *thread_multi_shellpair;
+        CInt_SIMINT_createThreadMultishellpair(&thread_multi_shellpair);
+		
 		#pragma omp for schedule(dynamic)
 		for (int MN = 0; MN < num_uniq_sp; MN++)
 		{
@@ -173,18 +198,91 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 				// Shell screening 
 				if (fabs(scrval1 * scrval2) <= scrtol2) continue;
 				
-				int nints;
-				double *integrals;
-				CInt_computeShellQuartet_SIMINT(simint, tid, M, N, P, Q, &integrals, &nints);
-				double st = get_wtime_sec();
-				Accum_Fock(
-					J_mat, K_mat, D_mat, integrals, tid, num_bas_func, 
-					M, N, P, Q, shell_bf_num, shell_bf_sind
-				);
-				double et = get_wtime_sec();
-				if (tid == 0) CInt_SIMINT_addupdateFtimer(simint, et - st);
+				// Push ket-side shell pair to corresponding list
+				int ket_id = CInt_SIMINT_getShellpairAMIndex(simint, P, Q);
+				KetShellpairList_t target_shellpair_list = &thread_ksp_lists->ket_shellpair_lists[ket_id];
+				add_shellpair_to_KetShellPairList(target_shellpair_list, P, Q);
+				
+				// If the ket-side shell pair list we just used is full, handle it
+				if (target_shellpair_list->npairs == MAX_LIST_SIZE)
+				{
+					double *thread_batch_eris;
+					int thread_nints;
+					
+					// Compute batched ERIs
+					CInt_computeShellQuartetBatch_SIMINT(
+						simint, tid, M, N,
+						target_shellpair_list->P_list,
+						target_shellpair_list->Q_list,
+						target_shellpair_list->npairs,
+						&thread_batch_eris, &thread_nints, 
+						&thread_multi_shellpair
+					);
+					
+					// Accumulate ERI results to global matrices
+					if (thread_nints > 0)
+					{
+						double st = get_wtime_sec();
+						Accum_Fock_with_KetshellpairList(
+							TinySCF, tid, M, N, 
+							target_shellpair_list->P_list,
+							target_shellpair_list->Q_list,
+							target_shellpair_list->npairs,
+							thread_batch_eris, thread_nints
+						);
+						double et = get_wtime_sec();
+						if (tid == 0) CInt_SIMINT_addupdateFtimer(simint, et - st);
+					}
+					
+					// Reset the computed ket-side shell pair list
+					target_shellpair_list->npairs = 0;
+				}
+			}
+			
+			// Handles all non-empty ket-side shell pair lists
+			for (int ket_id = 0; ket_id < MAX_AM_PAIRS; ket_id++)
+			{
+				KetShellpairList_t target_shellpair_list = &thread_ksp_lists->ket_shellpair_lists[ket_id];
+				
+				if (target_shellpair_list->npairs > 0)
+				{
+					double *thread_batch_eris;
+					int thread_nints;
+					
+					// Compute batched ERIs
+					CInt_computeShellQuartetBatch_SIMINT(
+						simint, tid, M, N,
+						target_shellpair_list->P_list,
+						target_shellpair_list->Q_list,
+						target_shellpair_list->npairs,
+						&thread_batch_eris, &thread_nints, 
+						&thread_multi_shellpair
+					);
+					
+					// Accumulate ERI results to global matrices
+					if (thread_nints > 0)
+					{
+						double st = get_wtime_sec();
+						Accum_Fock_with_KetshellpairList(
+							TinySCF, tid, M, N, 
+							target_shellpair_list->P_list,
+							target_shellpair_list->Q_list,
+							target_shellpair_list->npairs,
+							thread_batch_eris, thread_nints
+						);
+						double et = get_wtime_sec();
+						if (tid == 0) CInt_SIMINT_addupdateFtimer(simint, et - st);
+					}
+					
+					// Reset the computed ket-side shell pair list
+					target_shellpair_list->npairs = 0;
+				}
 			}
 		}
+		
+		// Free batch ERI auxiliary data structures
+		CInt_SIMINT_freeThreadMultishellpair(&thread_multi_shellpair);
+		free_ThreadKetShellpairLists(thread_ksp_lists);
 	}
 	
 	TinySCF_HJKmat_to_Fmat(Hcore_mat, J_mat, K_mat, F_mat, num_bas_func);
