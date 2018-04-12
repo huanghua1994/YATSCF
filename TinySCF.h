@@ -11,7 +11,10 @@
 struct TinySCF_struct 
 {
 	// OpenMP parallel setting and buffer
-	int nthreads;
+	int    nthreads;        // Number of threads
+	int    max_buf_size;    // Maximum buffer size for each thread's accumulating Fock matrix
+	double *Accum_Fock_buf; // Pointer to all thread's buffer for accumulating Fock matrix
+	
 	
 	// Chemical system info
 	BasisSet_t basis;     // Basis set object for storing chemical system info, handled by libcint

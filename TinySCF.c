@@ -8,6 +8,7 @@
 #include <mkl.h>
 
 #include "CInt.h"
+#include "cint_basisset.h"
 #include "utils.h"
 #include "TinySCF.h"
 #include "build_Fock.h"
@@ -24,10 +25,11 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	
 	double st = get_wtime_sec();
 	
-	TinySCF->mem_size = 0.0;
-	
-	// Initialize OpenMP parallel info and buffer
-	TinySCF->nthreads = omp_get_max_threads();
+	// Reset statistic info
+	TinySCF->mem_size       = 0.0;
+	TinySCF->init_time      = 0.0;
+	TinySCF->S_Hcore_time   = 0.0;
+	TinySCF->shell_scr_time = 0.0;
 	
 	// Load basis set and molecule from input and get chemical system info
 	CInt_createBasisSet(&(TinySCF->basis));
@@ -49,6 +51,18 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	printf("    # occupied orbits = %d\n", TinySCF->n_occ);
 	printf("    # charge          = %d\n", TinySCF->charge);
 	printf("    # electrons       = %d\n", TinySCF->electron);
+	
+	// Initialize OpenMP parallel info and buffer
+	int maxAM, max_buf_entry_size, total_buf_size;
+	_maxMomentum(TinySCF->basis, &maxAM);
+	max_buf_entry_size      = (maxAM + 1) * (maxAM + 2) / 2;
+	max_buf_entry_size      = max_buf_entry_size * max_buf_entry_size;
+	TinySCF->nthreads       = omp_get_max_threads();
+	TinySCF->max_buf_size   = max_buf_entry_size * 6;
+	total_buf_size          = TinySCF->max_buf_size * TinySCF->nthreads;
+	TinySCF->Accum_Fock_buf = ALIGN64B_MALLOC(DBL_SIZE * total_buf_size);
+	assert(TinySCF->Accum_Fock_buf);
+	TinySCF->mem_size += TinySCF->max_buf_size;
 	
 	// Compute auxiliary variables
 	TinySCF->nshellpairs = TinySCF->nshells   * TinySCF->nshells;
@@ -129,11 +143,6 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	// Must initialize F0 and R as 0 
 	memset(TinySCF->F0_mat, 0, mat_mem_size * MAX_DIIS);
 	memset(TinySCF->R_mat,  0, mat_mem_size * MAX_DIIS);
-
-	// Reset statistic info
-	TinySCF->init_time      = 0.0;
-	TinySCF->S_Hcore_time   = 0.0;
-	TinySCF->shell_scr_time = 0.0;
 	
 	double et = get_wtime_sec();
 	TinySCF->init_time = et - st;
@@ -147,6 +156,9 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 void free_TinySCF(TinySCF_t TinySCF)
 {
 	assert(TinySCF != NULL);
+	
+	// Free Fock accumulation buffer
+	ALIGN64B_FREE(TinySCF->Accum_Fock_buf);
 	
 	// Free shell quartet screening arrays
 	ALIGN64B_FREE(TinySCF->sp_scrval);

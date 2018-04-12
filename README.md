@@ -2,7 +2,7 @@
 
 My final project for CSE 8803 Spring 2018, a HF-SCF program:
 
-* Written in C, Parallelized with OpenMP in single node ("Tiny");
+* Written in C99, parallelized with OpenMP in single node ("Tiny");
 * Used [Simint](https://github.com/simint-chem/simint-generator) for ERIs;
 * Accelerate SCF convergence with SAD initial guess and DIIS.
 
@@ -20,4 +20,4 @@ Current status:
 
 ![](https://img.shields.io/badge/ERI%20batching-ready-brightgreen.svg)
 
-![](https://img.shields.io/badge/Fock%20accum.%20opt.-not%20ready-red.svg)
+![](https://img.shields.io/badge/Fock%20accum.%20opt.-partly%20ready-green.svg)
