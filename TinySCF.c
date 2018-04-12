@@ -316,7 +316,14 @@ static void TinySCF_get_initial_guess(TinySCF_t TinySCF)
 	
 	double *guess;
 	int spos, epos, ldg;
-	int nbf = TinySCF->nbasfuncs;
+	int nbf  = TinySCF->nbasfuncs;
+	
+	double R = 1.0;
+	int Q = TinySCF->charge;
+	int natoms = TinySCF->natoms;
+	int N_neutral = CInt_getNneutral(TinySCF->basis);
+	if (Q != 0 && N_neutral != 0) R = (N_neutral - Q)/(double)N_neutral;
+	
 	for (int i = 0; i < TinySCF->natoms; i++)
 	{
 		CInt_getInitialGuess(TinySCF->basis, i, &guess, &spos, &epos);
@@ -324,6 +331,9 @@ static void TinySCF_get_initial_guess(TinySCF_t TinySCF)
 		double *D_mat_ptr = TinySCF->D_mat + spos * nbf + spos;
 		copy_matrix_block(D_mat_ptr, nbf, guess, ldg, ldg, ldg);
 	}
+	
+	for (int i = 0; i < TinySCF->mat_size; i++)
+		TinySCF->D_mat[i] *= R * 0.5;
 }
 
 void TinySCF_calc_energy(TinySCF_t TinySCF)
@@ -341,8 +351,6 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 	// Get initial guess for density matrix
 	TinySCF_get_initial_guess(TinySCF);
 	
-	print_mat(TinySCF->D_mat, TinySCF->nbasfuncs, TinySCF->nbasfuncs, TinySCF->nbasfuncs, "Init D mat");
-	
 	// Calculate nuclear energy
 	TinySCF->nuc_energy = CInt_getNucEnergy(TinySCF->basis);
 	
@@ -350,7 +358,7 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 	printf("TinySCF SCF iteration started...\n");
 	TinySCF->iter = 0;
 	double prev_energy  = 0;
-	double energy_delta = 2018;
+	double energy_delta = 223;
 	while ((TinySCF->iter < TinySCF->niters) && (energy_delta >= TinySCF->energy_delta_tol))
 	{
 		printf("--------------- Iteration %d ---------------\n", TinySCF->iter);
@@ -364,22 +372,19 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		et1 = get_wtime_sec();
 		printf("* Build Fock matrix     : %.2lf (s)\n", et1 - st1);
 		
-		// DIIS (Pulay mixing)
-		st1 = get_wtime_sec();
-		TinySCF_DIIS(TinySCF);
-		et1 = get_wtime_sec();
-		printf("* DIIS procedure        : %.2lf (s)\n", et1 - st1);
-		
-		print_mat(TinySCF->F_mat, TinySCF->nbasfuncs, TinySCF->nbasfuncs, TinySCF->nbasfuncs, "Fock mat");
-		
 		// Calculate new system energy
 		st1 = get_wtime_sec();
 		TinySCF_calc_energy(TinySCF);
 		et1 = get_wtime_sec();
 		printf("* Calculate energy      : %.2lf (s)\n", et1 - st1);
-		
 		energy_delta = fabs(TinySCF->energy - prev_energy);
 		prev_energy = TinySCF->energy;
+		
+		// DIIS (Pulay mixing)
+		st1 = get_wtime_sec();
+		TinySCF_DIIS(TinySCF);
+		et1 = get_wtime_sec();
+		printf("* DIIS procedure        : %.2lf (s)\n", et1 - st1);
 		
 		// Diagonalize and build the density matrix
 		st1 = get_wtime_sec();
@@ -387,14 +392,13 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		et1 = get_wtime_sec();
 		printf("* Build density matrix  : %.2lf (s)\n", et1 - st1);
 		
-		TinySCF->iter++;
-		
 		et0 = get_wtime_sec();
 		
-		printf(
-			"* Energy = %.10lf (%.10lf), delta = %e, iteration runtime = %.2lf (s)\n", 
-			TinySCF->energy, TinySCF->energy - TinySCF->nuc_energy, energy_delta, et0 - st0
-		);
+		printf("* Energy = %.10lf (%.10lf), ", TinySCF->energy, TinySCF->energy - TinySCF->nuc_energy);
+		if (TinySCF->iter > 0) printf("delta = %e\n", energy_delta);
+		printf("* Iteration runtime = %.2lf (s)\n", et0 - st0);
+		
+		TinySCF->iter++;
 	}
 	printf("--------------- SCF iterations finished ---------------\n");
 }

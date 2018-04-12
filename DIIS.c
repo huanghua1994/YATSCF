@@ -41,7 +41,7 @@ void TinySCF_DIIS(TinySCF_t TinySCF)
 	
 	// Start DIIS
 	int ndiis = TinySCF->iter > MAX_DIIS ? MAX_DIIS : TinySCF->iter;
-	if (ndiis <= 3) return;
+	if (ndiis <= 2) return;
 	
 	// Reconstruct B_mat and DIIS_rhs, since they will be overwritten later
 	memset(B_mat, 0, DBL_SIZE * ldB * ldB);
