@@ -27,7 +27,10 @@ int main(int argc, char **argv)
 	init_TinySCF(TinySCF, argv[1], argv[2], atoi(argv[3]));
 	
 	TinySCF_compute_Hcore_Ovlp_mat(TinySCF);
+	
 	TinySCF_compute_sq_Schwarz_scrvals(TinySCF);
+	
+	TinySCF_get_initial_guess(TinySCF);
 	
 	TinySCF_do_SCF(TinySCF);
 	

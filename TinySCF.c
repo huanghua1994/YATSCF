@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
+#include <libgen.h>
 
 #include <mkl.h>
 
@@ -23,41 +24,64 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	
 	double st = get_wtime_sec();
 	
+	// Initialize OpenMP parallel info and buffer
 	TinySCF->nthreads = omp_get_max_threads();
 	
-	// Reset statistic info
-	TinySCF->mem_size       = 0.0;
-	TinySCF->init_time      = 0.0;
-	TinySCF->S_Hcore_time   = 0.0;
-	TinySCF->shell_scr_time = 0.0;
-	
-	// Load basis set and molecule from input
+	// Load basis set and molecule from input and get chemical system info
 	CInt_createBasisSet(&(TinySCF->basis));
 	CInt_loadBasisSet(TinySCF->basis, bas_fname, xyz_fname);
-	
-	// Calculate problem info
-	TinySCF->natoms      = CInt_getNumAtoms   (TinySCF->basis);
-	TinySCF->nshells     = CInt_getNumShells  (TinySCF->basis);
-	TinySCF->nbasfuncs   = CInt_getNumFuncs   (TinySCF->basis);
-	TinySCF->charge      = CInt_getTotalCharge(TinySCF->basis);
-	TinySCF->n_occ       = CInt_getNumOccOrb  (TinySCF->basis);
-	TinySCF->niters      = niters;
-	TinySCF->nshellpairs = TinySCF->nshells   * TinySCF->nshells;
-	TinySCF->mat_size    = TinySCF->nbasfuncs * TinySCF->nbasfuncs;
-	
+	TinySCF->natoms     = CInt_getNumAtoms   (TinySCF->basis);
+	TinySCF->nshells    = CInt_getNumShells  (TinySCF->basis);
+	TinySCF->nbasfuncs  = CInt_getNumFuncs   (TinySCF->basis);
+	TinySCF->n_occ      = CInt_getNumOccOrb  (TinySCF->basis);
+	TinySCF->charge     = CInt_getTotalCharge(TinySCF->basis);
+	TinySCF->electron   = CInt_getNneutral   (TinySCF->basis);
+	char *basis_name    = basename(bas_fname);
+	char *molecule_name = basename(xyz_fname);
 	printf("Job information:\n");
-	printf("    basis set file    = %s\n", bas_fname);
-	printf("    molecule  file    = %s\n", xyz_fname);
-	printf("    charge            = %d\n", TinySCF->charge);
+	printf("    basis set         = %s\n", basis_name);
+	printf("    molecule          = %s\n", molecule_name);
 	printf("    # atoms           = %d\n", TinySCF->natoms);
 	printf("    # shells          = %d\n", TinySCF->nshells);
 	printf("    # basis functions = %d\n", TinySCF->nbasfuncs);
+	printf("    # occupied orbits = %d\n", TinySCF->n_occ);
+	printf("    # charge          = %d\n", TinySCF->charge);
+	printf("    # electrons       = %d\n", TinySCF->electron);
 	
-	// Set screening thresholds
+	// Compute auxiliary variables
+	TinySCF->nshellpairs = TinySCF->nshells   * TinySCF->nshells;
+	TinySCF->mat_size    = TinySCF->nbasfuncs * TinySCF->nbasfuncs;
+	TinySCF->num_uniq_sp = (TinySCF->nshells + 1) * TinySCF->nshells / 2;
+	
+	// Set SCF iteration info
+	TinySCF->iter    = 0;
+	TinySCF->niters  = niters;
+	TinySCF->ene_tol = 1e-11;
+	
+	// Set screening thresholds, allocate memory for shell quartet screening 
 	TinySCF->shell_scrtol2 = 1e-11 * 1e-11;
+	TinySCF->sp_scrval     = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nshellpairs);
+	TinySCF->uniq_sp_lid   = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->num_uniq_sp);
+	TinySCF->uniq_sp_rid   = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->num_uniq_sp);
+	assert(TinySCF->sp_scrval     != NULL);
+	assert(TinySCF->uniq_sp_lid   != NULL);
+	assert(TinySCF->uniq_sp_rid   != NULL);
+	TinySCF->mem_size += DBL_SIZE * TinySCF->nshellpairs;
+	TinySCF->mem_size += INT_SIZE * 2 * TinySCF->num_uniq_sp;
 	
-	// Set SCF iteration termination criteria 
-	TinySCF->energy_delta_tol = 1e-10;
+	// Initialize Simint object and shell basis function index info
+	CInt_createSIMINT(TinySCF->basis, &(TinySCF->simint), TinySCF->nthreads);
+	TinySCF->shell_bf_sind = (int*) ALIGN64B_MALLOC(INT_SIZE * (TinySCF->nshells + 1));
+	TinySCF->shell_bf_num  = (int*) ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshells);
+	assert(TinySCF->shell_bf_sind != NULL);
+	assert(TinySCF->shell_bf_num  != NULL);
+	TinySCF->mem_size += INT_SIZE * (2 * TinySCF->nshells + 1);
+	for (int i = 0; i < TinySCF->nshells; i++)
+	{
+		TinySCF->shell_bf_sind[i] = CInt_getFuncStartInd(TinySCF->basis, i);
+		TinySCF->shell_bf_num[i]  = CInt_getShellDim    (TinySCF->basis, i);
+	}
+	TinySCF->shell_bf_sind[TinySCF->nshells] = TinySCF->nbasfuncs;
 	
 	// Allocate memory for matrices and temporary arrays used in SCF
 	int mat_mem_size   = DBL_SIZE * TinySCF->mat_size;
@@ -103,31 +127,12 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	// Must initialize F0 and R as 0 
 	memset(TinySCF->F0_mat, 0, mat_mem_size * MAX_DIIS);
 	memset(TinySCF->R_mat,  0, mat_mem_size * MAX_DIIS);
-	
-	// Allocate memory for all shells' basis function info
-	TinySCF->num_uniq_sp   = (TinySCF->nshells + 1) * TinySCF->nshells / 2;
-	TinySCF->sp_scrval     = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nshellpairs);
-	TinySCF->shell_bf_sind = (int*)    ALIGN64B_MALLOC(INT_SIZE * (TinySCF->nshells + 1));
-	TinySCF->shell_bf_num  = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshells);
-	TinySCF->uniq_sp_lid   = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->num_uniq_sp);
-	TinySCF->uniq_sp_rid   = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->num_uniq_sp);
-	assert(TinySCF->sp_scrval     != NULL);
-	assert(TinySCF->shell_bf_sind != NULL);
-	assert(TinySCF->shell_bf_num  != NULL);
-	assert(TinySCF->uniq_sp_lid   != NULL);
-	assert(TinySCF->uniq_sp_rid   != NULL);
-	TinySCF->mem_size += DBL_SIZE * TinySCF->nshellpairs;
-	TinySCF->mem_size += INT_SIZE * (2 * TinySCF->nshells + 1);
-	TinySCF->mem_size += INT_SIZE * 2 * TinySCF->num_uniq_sp;
-	for (int i = 0; i < TinySCF->nshells; i++)
-	{
-		TinySCF->shell_bf_sind[i] = CInt_getFuncStartInd(TinySCF->basis, i);
-		TinySCF->shell_bf_num[i]  = CInt_getShellDim    (TinySCF->basis, i);
-	}
-	TinySCF->shell_bf_sind[TinySCF->nshells] = TinySCF->nbasfuncs;
-	
-	// Initialize Simint object
-	CInt_createSIMINT(TinySCF->basis, &(TinySCF->simint), TinySCF->nthreads);
+
+	// Reset statistic info
+	TinySCF->mem_size       = 0.0;
+	TinySCF->init_time      = 0.0;
+	TinySCF->S_Hcore_time   = 0.0;
+	TinySCF->shell_scr_time = 0.0;
 	
 	double et = get_wtime_sec();
 	TinySCF->init_time = et - st;
@@ -141,6 +146,15 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 void free_TinySCF(TinySCF_t TinySCF)
 {
 	assert(TinySCF != NULL);
+	
+	// Free shell quartet screening arrays
+	ALIGN64B_FREE(TinySCF->sp_scrval);
+	ALIGN64B_FREE(TinySCF->uniq_sp_lid);
+	ALIGN64B_FREE(TinySCF->uniq_sp_rid);
+	
+	// Free shell basis function index info arrays
+	ALIGN64B_FREE(TinySCF->shell_bf_sind);
+	ALIGN64B_FREE(TinySCF->shell_bf_num);
 	
 	// Free matrices and temporary arrays used in SCF
 	ALIGN64B_FREE(TinySCF->Hcore_mat);
@@ -160,13 +174,6 @@ void free_TinySCF(TinySCF_t TinySCF)
 	ALIGN64B_FREE(TinySCF->B_mat);
 	ALIGN64B_FREE(TinySCF->DIIS_rhs);
 	ALIGN64B_FREE(TinySCF->DIIS_ipiv);
-	
-	// Free arrays for all shells' basis function info
-	ALIGN64B_FREE(TinySCF->sp_scrval);
-	ALIGN64B_FREE(TinySCF->shell_bf_sind);
-	ALIGN64B_FREE(TinySCF->shell_bf_num);
-	ALIGN64B_FREE(TinySCF->uniq_sp_lid);
-	ALIGN64B_FREE(TinySCF->uniq_sp_rid);
 	
 	// Free BasisSet_t and SIMINT_t object, require SIMINT_t object print stat info
 	CInt_destroyBasisSet(TinySCF->basis);
@@ -309,7 +316,7 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 	printf("time elapsed = %.2lf (s)\n", TinySCF->shell_scr_time);
 }
 
-static void TinySCF_get_initial_guess(TinySCF_t TinySCF)
+void TinySCF_get_initial_guess(TinySCF_t TinySCF)
 {
 	// TODO: use CInt_getInitialGuess() to get initial guess
 	memset(TinySCF->D_mat, 0, DBL_SIZE * TinySCF->mat_size);
@@ -318,12 +325,7 @@ static void TinySCF_get_initial_guess(TinySCF_t TinySCF)
 	int spos, epos, ldg;
 	int nbf  = TinySCF->nbasfuncs;
 	
-	double R = 1.0;
-	int Q = TinySCF->charge;
-	int natoms = TinySCF->natoms;
-	int N_neutral = CInt_getNneutral(TinySCF->basis);
-	if (Q != 0 && N_neutral != 0) R = (N_neutral - Q)/(double)N_neutral;
-	
+	// Copy the SAD data to diagonal block of the density matrix
 	for (int i = 0; i < TinySCF->natoms; i++)
 	{
 		CInt_getInitialGuess(TinySCF->basis, i, &guess, &spos, &epos);
@@ -332,34 +334,39 @@ static void TinySCF_get_initial_guess(TinySCF_t TinySCF)
 		copy_matrix_block(D_mat_ptr, nbf, guess, ldg, ldg, ldg);
 	}
 	
+	// Scaling the initial density matrix according to the charge and neutral
+	double R = 0.5;
+	int charge   = TinySCF->charge;
+	int electron = TinySCF->electron; 
+	if (charge != 0 && electron != 0) 
+		R = (double)(electron - charge) / (double)(electron);
 	for (int i = 0; i < TinySCF->mat_size; i++)
-		TinySCF->D_mat[i] *= R * 0.5;
+		TinySCF->D_mat[i] *= R;
+	
+	// Calculate nuclear energy
+	TinySCF->nuc_energy = CInt_getNucEnergy(TinySCF->basis);
 }
 
-void TinySCF_calc_energy(TinySCF_t TinySCF)
+// Compute Hartree-Fock energy
+static void TinySCF_calc_energy(TinySCF_t TinySCF)
 {
 	double energy = 0.0;
+	
 	#pragma simd 
 	for (int i = 0; i < TinySCF->mat_size; i++)
 		energy += TinySCF->D_mat[i] * (TinySCF->F_mat[i] + TinySCF->Hcore_mat[i]);
 	
-	TinySCF->energy = TinySCF->nuc_energy + energy;
+	TinySCF->HF_energy = energy;
 }
 
 void TinySCF_do_SCF(TinySCF_t TinySCF)
 {
-	// Get initial guess for density matrix
-	TinySCF_get_initial_guess(TinySCF);
-	
-	// Calculate nuclear energy
-	TinySCF->nuc_energy = CInt_getNucEnergy(TinySCF->basis);
-	
 	// Start SCF iterations
 	printf("TinySCF SCF iteration started...\n");
 	TinySCF->iter = 0;
 	double prev_energy  = 0;
 	double energy_delta = 223;
-	while ((TinySCF->iter < TinySCF->niters) && (energy_delta >= TinySCF->energy_delta_tol))
+	while ((TinySCF->iter < TinySCF->niters) && (energy_delta >= TinySCF->ene_tol))
 	{
 		printf("--------------- Iteration %d ---------------\n", TinySCF->iter);
 		
@@ -377,8 +384,8 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		TinySCF_calc_energy(TinySCF);
 		et1 = get_wtime_sec();
 		printf("* Calculate energy      : %.2lf (s)\n", et1 - st1);
-		energy_delta = fabs(TinySCF->energy - prev_energy);
-		prev_energy = TinySCF->energy;
+		energy_delta = fabs(TinySCF->HF_energy - prev_energy);
+		prev_energy = TinySCF->HF_energy;
 		
 		// DIIS (Pulay mixing)
 		st1 = get_wtime_sec();
@@ -394,7 +401,7 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		
 		et0 = get_wtime_sec();
 		
-		printf("* Energy = %.10lf (%.10lf), ", TinySCF->energy, TinySCF->energy - TinySCF->nuc_energy);
+		printf("* Energy = %.10lf (%.10lf), ", TinySCF->HF_energy + TinySCF->nuc_energy, TinySCF->HF_energy);
 		if (TinySCF->iter > 0) printf("delta = %e\n", energy_delta);
 		printf("* Iteration runtime = %.2lf (s)\n", et0 - st0);
 		
