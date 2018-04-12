@@ -12,12 +12,12 @@ Current status:
 
 ![](https://img.shields.io/badge/Same%20conv.%20energy%20as%20GTFock-yes-brightgreen.svg)
 
-![](https://img.shields.io/badge/SAD%20initial%20guess-yes-brightgreen.svg)
+![](https://img.shields.io/badge/SAD%20initial%20guess-ready-brightgreen.svg)
 
 ![](https://img.shields.io/badge/DIIS%20acceleration-problematic-yellow.svg)
 
-![](https://img.shields.io/badge/ERI%20batching-not%20ready-red.svg)
+![](https://img.shields.io/badge/OpenMP%20parallelization-ready-brightgreen.svg)
 
-![](https://img.shields.io/badge/OpenMP%20parallelization-not%20ready-red.svg)
+![](https://img.shields.io/badge/ERI%20batching-not%20ready-red.svg)
 
 ![](https://img.shields.io/badge/Fock%20accum.%20opt.-not%20ready-red.svg)

@@ -139,7 +139,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	
 	// Print memory usage
 	printf("TinySCF initialization over, memory usage: %.2lf MB, ", TinySCF->mem_size / 1048576.0);
-	printf("time elapsed = %.2lf (s)\n", TinySCF->init_time);
+	printf("time elapsed = %.3lf (s)\n", TinySCF->init_time);
 }
 
 
@@ -191,27 +191,32 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 	// Compute core Hamiltonian and overlap matrix
 	memset(TinySCF->Hcore_mat, 0, DBL_SIZE * TinySCF->mat_size);
 	memset(TinySCF->S_mat,     0, DBL_SIZE * TinySCF->mat_size);
-	for (int M = 0; M < TinySCF->nshells; M++)
+	#pragma omp parallel
 	{
-		for (int N = 0; N < TinySCF->nshells; N++)
+		int tid = omp_get_thread_num();
+		#pragma omp for schedule(dynamic)
+		for (int M = 0; M < TinySCF->nshells; M++)
 		{
-			int nints, tid = 0;
-			double *integrals;
-			
-			int mat_topleft_offset = TinySCF->shell_bf_sind[M] * TinySCF->nbasfuncs + TinySCF->shell_bf_sind[N];
-			double *S_mat_ptr      = TinySCF->S_mat     + mat_topleft_offset;
-			double *Hcore_mat_ptr  = TinySCF->Hcore_mat + mat_topleft_offset;
-			
-			int nrows = TinySCF->shell_bf_num[M];
-			int ncols = TinySCF->shell_bf_num[N];
-			
-			// Compute the contribution of current shell pair to core Hamiltonian matrix
-			CInt_computePairOvl_SIMINT(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
-			if (nints > 0) copy_matrix_block(S_mat_ptr, TinySCF->nbasfuncs, integrals, ncols, nrows, ncols);
-			
-			// Compute the contribution of current shell pair to overlap matrix
-			CInt_computePairCoreH_SIMINT(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
-			if (nints > 0) copy_matrix_block(Hcore_mat_ptr, TinySCF->nbasfuncs, integrals, ncols, nrows, ncols);
+			for (int N = 0; N < TinySCF->nshells; N++)
+			{
+				int nints;
+				double *integrals;
+				
+				int mat_topleft_offset = TinySCF->shell_bf_sind[M] * TinySCF->nbasfuncs + TinySCF->shell_bf_sind[N];
+				double *S_mat_ptr      = TinySCF->S_mat     + mat_topleft_offset;
+				double *Hcore_mat_ptr  = TinySCF->Hcore_mat + mat_topleft_offset;
+				
+				int nrows = TinySCF->shell_bf_num[M];
+				int ncols = TinySCF->shell_bf_num[N];
+				
+				// Compute the contribution of current shell pair to core Hamiltonian matrix
+				CInt_computePairOvl_SIMINT(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
+				if (nints > 0) copy_matrix_block(S_mat_ptr, TinySCF->nbasfuncs, integrals, ncols, nrows, ncols);
+				
+				// Compute the contribution of current shell pair to overlap matrix
+				CInt_computePairCoreH_SIMINT(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
+				if (nints > 0) copy_matrix_block(Hcore_mat_ptr, TinySCF->nbasfuncs, integrals, ncols, nrows, ncols);
+			}
 		}
 	}
 	
@@ -239,7 +244,7 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 	
 	// Print runtime
 	printf("TinySCF precompute Hcore, S, and X matrices over,   ");
-	printf("time elapsed = %.2lf (s)\n", TinySCF->S_Hcore_time);
+	printf("time elapsed = %.3lf (s)\n", TinySCF->S_Hcore_time);
 }
 
 void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
@@ -250,31 +255,36 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 	
 	// Compute screening values using Schwarz inequality
 	double global_max_scrval = 0.0;
-	for (int M = 0; M < TinySCF->nshells; M++)
+	#pragma omp parallel
 	{
-		int dimM = TinySCF->shell_bf_num[M];
-		for (int N = 0; N < TinySCF->nshells; N++)
+		int tid = omp_get_thread_num();
+		#pragma omp for schedule(dynamic) reduction(max:global_max_scrval)
+		for (int M = 0; M < TinySCF->nshells; M++)
 		{
-			int dimN = TinySCF->shell_bf_num[N];
-			
-			int nints;
-			double *integrals;
-			CInt_computeShellQuartet_SIMINT(TinySCF->simint, 0, M, N, M, N, &integrals, &nints);
-			
-			double maxval = 0.0;
-			if (nints > 0)
+			int dimM = TinySCF->shell_bf_num[M];
+			for (int N = 0; N < TinySCF->nshells; N++)
 			{
-				// Loop over all ERIs in a shell quartet and find the max value
-				for (int iM = 0; iM < dimM; iM++)
-					for (int iN = 0; iN < dimN; iN++)
-					{
-						int index = iN * (dimM * dimN * dimM + dimM) + iM * (dimN * dimM + 1); // Simint layout
-						double val = fabs(integrals[index]);
-						if (val > maxval) maxval = val;
-					}
+				int dimN = TinySCF->shell_bf_num[N];
+				
+				int nints;
+				double *integrals;
+				CInt_computeShellQuartet_SIMINT(TinySCF->simint, tid, M, N, M, N, &integrals, &nints);
+				
+				double maxval = 0.0;
+				if (nints > 0)
+				{
+					// Loop over all ERIs in a shell quartet and find the max value
+					for (int iM = 0; iM < dimM; iM++)
+						for (int iN = 0; iN < dimN; iN++)
+						{
+							int index = iN * (dimM * dimN * dimM + dimM) + iM * (dimN * dimM + 1); // Simint layout
+							double val = fabs(integrals[index]);
+							if (val > maxval) maxval = val;
+						}
+				}
+				TinySCF->sp_scrval[M * TinySCF->nshells + N] = maxval;
+				if (maxval > global_max_scrval) global_max_scrval = maxval;
 			}
-			TinySCF->sp_scrval[M * TinySCF->nshells + N] = maxval;
-			if (maxval > global_max_scrval) global_max_scrval = maxval;
 		}
 	}
 	TinySCF->max_scrval = global_max_scrval;
@@ -313,7 +323,7 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 	
 	// Print runtime
 	printf("TinySCF precompute shell screening info over,       ");
-	printf("time elapsed = %.2lf (s)\n", TinySCF->shell_scr_time);
+	printf("time elapsed = %.3lf (s)\n", TinySCF->shell_scr_time);
 }
 
 void TinySCF_get_initial_guess(TinySCF_t TinySCF)
@@ -377,13 +387,13 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		st1 = get_wtime_sec();
 		TinySCF_build_FockMat(TinySCF);
 		et1 = get_wtime_sec();
-		printf("* Build Fock matrix     : %.2lf (s)\n", et1 - st1);
+		printf("* Build Fock matrix     : %.3lf (s)\n", et1 - st1);
 		
 		// Calculate new system energy
 		st1 = get_wtime_sec();
 		TinySCF_calc_energy(TinySCF);
 		et1 = get_wtime_sec();
-		printf("* Calculate energy      : %.2lf (s)\n", et1 - st1);
+		printf("* Calculate energy      : %.3lf (s)\n", et1 - st1);
 		energy_delta = fabs(TinySCF->HF_energy - prev_energy);
 		prev_energy = TinySCF->HF_energy;
 		
@@ -391,19 +401,19 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		st1 = get_wtime_sec();
 		TinySCF_DIIS(TinySCF);
 		et1 = get_wtime_sec();
-		printf("* DIIS procedure        : %.2lf (s)\n", et1 - st1);
+		printf("* DIIS procedure        : %.3lf (s)\n", et1 - st1);
 		
 		// Diagonalize and build the density matrix
 		st1 = get_wtime_sec();
 		TinySCF_build_DenMat(TinySCF);
 		et1 = get_wtime_sec();
-		printf("* Build density matrix  : %.2lf (s)\n", et1 - st1);
+		printf("* Build density matrix  : %.3lf (s)\n", et1 - st1);
 		
 		et0 = get_wtime_sec();
 		
-		printf("* Energy = %.10lf (%.10lf), ", TinySCF->HF_energy + TinySCF->nuc_energy, TinySCF->HF_energy);
-		if (TinySCF->iter > 0) printf("delta = %e\n", energy_delta);
-		printf("* Iteration runtime = %.2lf (s)\n", et0 - st0);
+		printf("* Energy = %.10lf (%.10lf)", TinySCF->HF_energy + TinySCF->nuc_energy, TinySCF->HF_energy);
+		if (TinySCF->iter > 0) printf(", delta = %e", energy_delta);
+		printf("\n* Iteration runtime = %.3lf (s)\n", et0 - st0);
 		
 		TinySCF->iter++;
 	}

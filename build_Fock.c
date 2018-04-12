@@ -8,7 +8,17 @@
 #include "TinySCF.h"
 #include "build_Fock.h"
 
-inline void unique_integral_coef(int M, int N, int P, int Q, double *coef)
+static inline void atomic_add_f64(volatile double *global_value, double addend)
+{
+	uint64_t expected_value, new_value;
+	do {
+		double old_value = *global_value;
+		expected_value = _castf64_u64(old_value);
+		new_value = _castf64_u64(old_value + addend);
+	} while (!__sync_bool_compare_and_swap((volatile uint64_t*)global_value, expected_value, new_value));
+}
+
+static inline void unique_integral_coef(int M, int N, int P, int Q, double *coef)
 {
 	int flag1 = (M == N) ? 0 : 1;
 	int flag2 = (P == Q) ? 0 : 1;
@@ -62,24 +72,35 @@ void Accum_Fock(
 	{
 		for (int iN = 0; iN < dimN; iN++) 
 		{
+			int iMN = iM * nbf + iN;
+			int iMQ_base = iM * nbf;
+			int iNQ_base = iN * nbf;
+			double j_MN = 0.0;
 			for (int iP = 0; iP < dimP; iP++) 
 			{
+				int iMP = iM * nbf + iP;
+				int iNP = iN * nbf + iP;
+				int iPQ_base = iP * nbf;
 				int Ibase = dimQ * (iP + dimP * (iN + dimN * iM));
+				double k_MP = 0.0, k_NP = 0.0;
 				// dimQ is small, vectorizing short loops may hurt performance since
 				// it needs horizon reduction after the loop
 				for (int iQ = 0; iQ < dimQ; iQ++) 
 				{
 					double I = ERI[Ibase + iQ];
 					
-					J_MN[iM * nbf + iN] += coef[0] * D_PQ[iP * nbf + iQ] * I;
-					J_PQ[iP * nbf + iQ] += coef[1] * D_MN[iM * nbf + iN] * I;
+					j_MN += coef[0] * D_PQ[iPQ_base + iQ] * I;
+					k_MP -= coef[2] * D_NQ[iNQ_base + iQ] * I;
+					k_NP -= coef[3] * D_MQ[iMQ_base + iQ] * I;
 					
-					K_MP[iM * nbf + iP] -= coef[2] * D_NQ[iN * nbf + iQ] * I;
-					K_NP[iN * nbf + iP] -= coef[3] * D_MQ[iM * nbf + iQ] * I;
-					K_MQ[iM * nbf + iQ] -= coef[4] * D_NP[iN * nbf + iP] * I;
-					K_NQ[iN * nbf + iQ] -= coef[5] * D_MP[iM * nbf + iP] * I;
+					atomic_add_f64(&J_PQ[iPQ_base + iQ], coef[1] * D_MN[iMN] * I);
+					atomic_add_f64(&K_MQ[iMQ_base + iQ], -coef[4] * D_NP[iNP] * I);
+					atomic_add_f64(&K_NQ[iNQ_base + iQ], -coef[5] * D_MP[iMP] * I);
 				}
+				atomic_add_f64(&K_MP[iMP], k_MP);
+				atomic_add_f64(&K_NP[iNP], k_NP);
 			} // for (int iM = 0; iM < dimM; iM++) 
+			atomic_add_f64(&J_MN[iMN], j_MN);
 		} // for (int iQ = 0; iQ < dimQ; iQ++) 
 	} // for (int iN = 0; iN < dimN; iN++)
 }
@@ -125,36 +146,44 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 	memset(J_mat, 0, DBL_SIZE * TinySCF->mat_size);
 	memset(K_mat, 0, DBL_SIZE * TinySCF->mat_size);
 	
-	for (int MN = 0; MN < num_uniq_sp; MN++)
+	#pragma omp parallel
 	{
-		int M = uniq_sp_lid[MN];
-		int N = uniq_sp_rid[MN];
-		double scrval1 = sp_scrval[M * nshells + N];
-		for (int PQ = 0; PQ < num_uniq_sp; PQ++)
+		int tid = omp_get_thread_num();
+		#pragma omp for schedule(dynamic)
+		for (int MN = 0; MN < num_uniq_sp; MN++)
 		{
-			int P = uniq_sp_lid[PQ];
-			int Q = uniq_sp_rid[PQ];
-			double scrval2 = sp_scrval[P * nshells + Q];
-			
-			// Symmetric uniqueness check, from GTFock
-			if ((M > P && (M + P) % 2 == 1) || 
-				(M < P && (M + P) % 2 == 0))
-			continue; 
-			
-			if ((M == P) &&	((N > Q && (N + Q) % 2 == 1) ||
-				(N < Q && (N + Q) % 2 == 0)))
-			continue;
-			
-			// Shell screening 
-			if (fabs(scrval1 * scrval2) <= scrtol2) continue;
-			
-			int nints;
-			double *integrals;
-			CInt_computeShellQuartet_SIMINT(simint, 0, M, N, P, Q, &integrals, &nints);
-			Accum_Fock(
-				J_mat, K_mat, D_mat, integrals, 0, num_bas_func, 
-				M, N, P, Q, shell_bf_num, shell_bf_sind
-			);
+			int M = uniq_sp_lid[MN];
+			int N = uniq_sp_rid[MN];
+			double scrval1 = sp_scrval[M * nshells + N];
+			for (int PQ = 0; PQ < num_uniq_sp; PQ++)
+			{
+				int P = uniq_sp_lid[PQ];
+				int Q = uniq_sp_rid[PQ];
+				double scrval2 = sp_scrval[P * nshells + Q];
+				
+				// Symmetric uniqueness check, from GTFock
+				if ((M > P && (M + P) % 2 == 1) || 
+					(M < P && (M + P) % 2 == 0))
+				continue; 
+				
+				if ((M == P) &&	((N > Q && (N + Q) % 2 == 1) ||
+					(N < Q && (N + Q) % 2 == 0)))
+				continue;
+				
+				// Shell screening 
+				if (fabs(scrval1 * scrval2) <= scrtol2) continue;
+				
+				int nints;
+				double *integrals;
+				CInt_computeShellQuartet_SIMINT(simint, tid, M, N, P, Q, &integrals, &nints);
+				double st = get_wtime_sec();
+				Accum_Fock(
+					J_mat, K_mat, D_mat, integrals, tid, num_bas_func, 
+					M, N, P, Q, shell_bf_num, shell_bf_sind
+				);
+				double et = get_wtime_sec();
+				if (tid == 0) CInt_SIMINT_addupdateFtimer(simint, et - st);
+			}
 		}
 	}
 	
