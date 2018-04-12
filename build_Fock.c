@@ -10,6 +10,10 @@
 #include "shell_quartet_list.h"
 #include "Accum_Fock.h"
 
+#define ACCUM_FOCK_PARAM 	TinySCF, tid, M, N, P_list[ipair], Q_list[ipair], \
+							thread_eris + ipair * thread_nints, \
+							load_MN, load_P, write_MN, write_P
+
 void Accum_Fock_with_KetshellpairList(
 	TinySCF_t TinySCF, int tid, int M, int N, 
 	int *P_list, int *Q_list, int npairs, 
@@ -17,6 +21,8 @@ void Accum_Fock_with_KetshellpairList(
 )
 {
 	int load_MN, load_P, write_MN, write_P, prev_P = -1;
+	int dimM = TinySCF->shell_bf_num[M];
+	int dimN = TinySCF->shell_bf_num[N];
 	for (int ipair = 0; ipair < npairs; ipair++)
 	{
 		load_MN = (ipair == 0) ? 1 : 0;
@@ -33,11 +39,17 @@ void Accum_Fock_with_KetshellpairList(
 		}
 		prev_P = P_list[ipair];
 		
-		Accum_Fock(
-			TinySCF, tid, M, N, P_list[ipair], Q_list[ipair], 
-			thread_eris + ipair * thread_nints,
-			load_MN, load_P, write_MN, write_P
-		);
+		int dimP = TinySCF->shell_bf_num[P_list[ipair]];
+		int dimQ = TinySCF->shell_bf_num[Q_list[ipair]];
+		int is_1111 = dimM * dimN * dimP * dimQ;
+		
+		if (is_1111 == 1)    Accum_Fock_1111  (ACCUM_FOCK_PARAM);
+		else if (dimQ == 1)  Accum_Fock_dimQ1 (ACCUM_FOCK_PARAM);
+		else if (dimQ == 3)  Accum_Fock_dimQ3 (ACCUM_FOCK_PARAM);
+		else if (dimQ == 6)  Accum_Fock_dimQ6 (ACCUM_FOCK_PARAM);
+		else if (dimQ == 10) Accum_Fock_dimQ10(ACCUM_FOCK_PARAM);
+		else if (dimQ == 15) Accum_Fock_dimQ15(ACCUM_FOCK_PARAM);
+		else Accum_Fock(ACCUM_FOCK_PARAM);
 	}
 }
 
