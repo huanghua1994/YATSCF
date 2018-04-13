@@ -2,7 +2,7 @@ CC  = icc
 CXX = icpc
 EXE = TinySCF.exe
 
-BLAS_LIBS      = -mkl
+BLAS_LIBS      = -mkl=parallel
 LIBCINT_INCDIR = /home/huangh/libcint
 LIBCINT_LIBDIR = /home/huangh/libcint
 LIBCINT_LIB    = ${LIBCINT_LIBDIR}/libcint.a 

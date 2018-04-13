@@ -20,4 +20,4 @@ Current status:
 
 ![](https://img.shields.io/badge/ERI%20batching-ready-brightgreen.svg)
 
-![](https://img.shields.io/badge/Fock%20accum.%20opt-partly%20ready-green.svg)
+![](https://img.shields.io/badge/Fock%20accum.%20opt.-ready-brightgreen.svg)

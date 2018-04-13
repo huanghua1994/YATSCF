@@ -55,7 +55,8 @@ void Accum_Fock_with_KetshellpairList(
 
 // F = H_core + (J + J^T) / 2 + (K + K^T) / 2;
 void TinySCF_HJKmat_to_Fmat(double *Hcore_mat, double *J_mat, double *K_mat, double *F_mat, int nbf)
-{	
+{
+	#pragma omp for
 	for (int irow = 0; irow < nbf; irow++)
 	{
 		int idx = irow * nbf + irow;
@@ -215,7 +216,8 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 		// Free batch ERI auxiliary data structures
 		CInt_SIMINT_freeThreadMultishellpair(&thread_multi_shellpair);
 		free_ThreadKetShellpairLists(thread_ksp_lists);
+		
+		#pragma omp barrier
+		TinySCF_HJKmat_to_Fmat(Hcore_mat, J_mat, K_mat, F_mat, num_bas_func);
 	}
-	
-	TinySCF_HJKmat_to_Fmat(Hcore_mat, J_mat, K_mat, F_mat, num_bas_func);
 }
