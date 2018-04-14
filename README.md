@@ -14,10 +14,12 @@ Current status:
 
 ![](https://img.shields.io/badge/SAD%20initial%20guess-ready-brightgreen.svg)
 
-![](https://img.shields.io/badge/DIIS%20acceleration-naive-green.svg)
+![](https://img.shields.io/badge/DIIS%20acceleration-ready-brightgreen.svg)
 
 ![](https://img.shields.io/badge/OpenMP%20parallelization-ready-brightgreen.svg)
 
 ![](https://img.shields.io/badge/ERI%20batching-ready-brightgreen.svg)
 
 ![](https://img.shields.io/badge/Fock%20accum.%20opt.-ready-brightgreen.svg)
+
+![](https://img.shields.io/badge/Repack%20libcint-no-red.svg)

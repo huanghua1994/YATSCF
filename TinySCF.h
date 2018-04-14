@@ -58,11 +58,15 @@ struct TinySCF_struct
 	double *tmp_mat;      // Temporary matrix
 	
 	// Matrices and arrays for DIIS
-	double *F0_mat;       // Previous Fock matrices
-	double *R_mat;        // Intermediate matrix
+	double *F0_mat;       // Previous X^T * F * X matrices
+	double *R_mat;        // "Residual" matrix
 	double *B_mat;        // Linear system coefficient matrix in DIIS
+	double *FDS_mat;      // F * D * S matrix in Commutator DIIS
 	double *DIIS_rhs;     // Linear system right-hand-side vector in DIIS
 	int    *DIIS_ipiv;    // Permutation info for DGESV in DIIS
+	int    DIIS_len;      // Number of previous F matrices
+	int    DIIS_bmax_id;  // The ID of a previous F matrix whose residual has the largest 2-norm
+	double DIIS_bmax;     // The largest 2-norm of the stored F matrices' residuals
 	
 	// Statistic 
 	double mem_size, init_time, S_Hcore_time, shell_scr_time;

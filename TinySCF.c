@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <math.h>
 #include <libgen.h>
+#include <float.h>
 
 #include <mkl.h>
 
@@ -132,6 +133,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->F0_mat    = (double*) ALIGN64B_MALLOC(mat_mem_size * MAX_DIIS);
 	TinySCF->R_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size * MAX_DIIS);
 	TinySCF->B_mat     = (double*) ALIGN64B_MALLOC(DIIS_row_memsize * (MAX_DIIS + 1));
+	TinySCF->FDS_mat   = (double*) ALIGN64B_MALLOC(mat_mem_size);
 	TinySCF->DIIS_rhs  = (double*) ALIGN64B_MALLOC(DIIS_row_memsize);
 	TinySCF->DIIS_ipiv = (int*)    ALIGN64B_MALLOC(INT_SIZE * (MAX_DIIS + 1));
 	assert(TinySCF->F0_mat    != NULL);
@@ -142,9 +144,18 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->mem_size += MAX_DIIS * 2 * mat_mem_size;
 	TinySCF->mem_size += DIIS_row_memsize * (MAX_DIIS + 2);
 	TinySCF->mem_size += INT_SIZE * (MAX_DIIS + 1);
+	TinySCF->mem_size += mat_mem_size;
 	// Must initialize F0 and R as 0 
 	memset(TinySCF->F0_mat, 0, mat_mem_size * MAX_DIIS);
 	memset(TinySCF->R_mat,  0, mat_mem_size * MAX_DIIS);
+	TinySCF->DIIS_len = 0;
+	// Initialize B_mat
+	for (int i = 0; i < (MAX_DIIS + 1) * (MAX_DIIS + 1); i++)
+		TinySCF->B_mat[i] = -1.0;
+	for (int i = 0; i < (MAX_DIIS + 1); i++)
+		TinySCF->B_mat[i * (MAX_DIIS + 1) + i] = 0.0;
+	TinySCF->DIIS_bmax_id = 0;
+	TinySCF->DIIS_bmax    = -DBL_MAX;
 	
 	double et = get_wtime_sec();
 	TinySCF->init_time = et - st;
@@ -188,6 +199,7 @@ void free_TinySCF(TinySCF_t TinySCF)
 	ALIGN64B_FREE(TinySCF->F0_mat);
 	ALIGN64B_FREE(TinySCF->R_mat);
 	ALIGN64B_FREE(TinySCF->B_mat);
+	ALIGN64B_FREE(TinySCF->FDS_mat);
 	ALIGN64B_FREE(TinySCF->DIIS_rhs);
 	ALIGN64B_FREE(TinySCF->DIIS_ipiv);
 	

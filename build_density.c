@@ -46,15 +46,9 @@ void TinySCF_build_DenMat(TinySCF_t TinySCF)
 	int    nbf       = TinySCF->nbasfuncs;
 	int    n_occ     = TinySCF->n_occ;
 	
-	// F1 = X^T * F * X
-	// Use C_mat to store X^T * F
-	cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, nbf, nbf, nbf, 
-				1.0, X_mat, nbf, F_mat, nbf, 0.0, C_mat, nbf);
-	// Use F_mat to store F1
-	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
-				1.0, C_mat, nbf, X_mat, nbf, 0.0, F_mat, nbf);
-				
-	// Diagonalize F1 = C0^T * epsilon * C0, and C = X * C0 
+	// Notice: here F_mat is already = X^T * F * X
+	
+	// Diagonalize F = C0^T * epsilon * C0, and C = X * C0 
 	// [C0, E] = eig(F1), now C0 is stored in F_mat
 	LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', nbf, F_mat, nbf, eigval);  // F_mat will be overwritten by eigenvectors
 	// C = X * C0, now C is stored in C_mat
@@ -71,7 +65,4 @@ void TinySCF_build_DenMat(TinySCF_t TinySCF)
 	// D = C_occ * C_occ^T
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, nbf, nbf, n_occ, 
 				1.0, Cocc_mat, n_occ, Cocc_mat, n_occ, 0.0, D_mat, nbf);
-	
-	// Recover F_mat for output
-	memcpy(F_mat, TinySCF->F0_mat + (MAX_DIIS - 1) * TinySCF->mat_size, DBL_SIZE * TinySCF->mat_size);
 }

@@ -11,65 +11,113 @@
 
 void TinySCF_DIIS(TinySCF_t TinySCF)
 {
-	double *F_mat     = TinySCF->F_mat;
-	double *F0_mat    = TinySCF->F0_mat;
-	double *R_mat     = TinySCF->R_mat;
-	double *B_mat     = TinySCF->B_mat;
-	double *DIIS_rhs  = TinySCF->DIIS_rhs;
-	int    *ipiv      = TinySCF->DIIS_ipiv;
-	int mat_size      = TinySCF->mat_size;
-	int mat_mem_size  = DBL_SIZE * mat_size;
-	int ldB           = MAX_DIIS + 1;
+	double *S_mat    = TinySCF->S_mat;
+	double *F_mat    = TinySCF->F_mat;
+	double *D_mat    = TinySCF->D_mat;
+	double *X_mat    = TinySCF->X_mat;
+	double *F0_mat   = TinySCF->F0_mat;
+	double *R_mat    = TinySCF->R_mat;
+	double *B_mat    = TinySCF->B_mat;
+	double *FDS_mat  = TinySCF->FDS_mat;
+	double *DIIS_rhs = TinySCF->DIIS_rhs;
+	double *tmp_mat  = TinySCF->tmp_mat;
+	int    *ipiv     = TinySCF->DIIS_ipiv;
+	int mat_size     = TinySCF->mat_size;
+	int mat_mem_size = DBL_SIZE * mat_size;
+	int ldB = MAX_DIIS + 1;
+	int nbf = TinySCF->nbasfuncs;
 	
-	// F_mat is treated as a column vector in my MATLAB code
-	// For performance, we treat it as a row vector here, and
-	// perform necessary transpose for the R_mat
-	
-	// Drop the oldest F_mat and its corresponding residual vector
-	for (int i = 0; i < MAX_DIIS - 1; i++)
+	if (TinySCF->iter <= 1)
 	{
-		memcpy(R_mat  + i * mat_size, R_mat  + (i + 1) * mat_size, mat_mem_size);
-		memcpy(F0_mat + i * mat_size, F0_mat + (i + 1) * mat_size, mat_mem_size);
+		// F = X^T * F * X
+		// Use tmp_mat to store X^T * F
+		cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, nbf, nbf, nbf, 
+					1.0, X_mat, nbf, F_mat, nbf, 0.0, tmp_mat, nbf);
+		// Use F_mat to store X^T * F * X
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
+					1.0, tmp_mat, nbf, X_mat, nbf, 0.0, F_mat, nbf);
+		return;
 	}
 	
-	// Copy new F_mat and compute its residual vector
-	int offset0 = (MAX_DIIS - 2) * mat_size;
-	int offset1 = (MAX_DIIS - 1) * mat_size;
-	memcpy(F0_mat + offset1, F_mat, mat_mem_size);
-	for (int i = 0; i < mat_size; i++)
-		R_mat[offset1 + i] = F0_mat[offset1 + i] - F0_mat[offset0 + i];
-	
-	// Start DIIS
-	int ndiis = TinySCF->iter > MAX_DIIS ? MAX_DIIS : TinySCF->iter;
-	if (ndiis <= 2) return;
-	
-	// Reconstruct B_mat and DIIS_rhs, since they will be overwritten later
-	memset(B_mat, 0, DBL_SIZE * ldB * ldB);
-	memset(DIIS_rhs, 0, DBL_SIZE * ldB);
-	for (int i = 0; i < MAX_DIIS; i++)
+	int DIIS_idx;   // Which historic F matrix will be replaced
+	if (TinySCF->DIIS_len < MAX_DIIS)
 	{
-		B_mat[i * ldB + MAX_DIIS] = -1.0;
-		B_mat[MAX_DIIS * ldB + i] =  1.0;
+		DIIS_idx = TinySCF->DIIS_len;
+		TinySCF->DIIS_len++;
+	} else {
+		DIIS_idx = TinySCF->DIIS_bmax_id;
 	}
-	DIIS_rhs[ldB - 1] = 1;
-
-	// B(1 : max_diis, 1 : max_diis) = R^T * R;
-	// Here our R_mat equals to R^T since R_mat is stored in row-major style
-	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, MAX_DIIS, MAX_DIIS, mat_size,
-				1.0, R_mat, mat_size, R_mat, mat_size, 0.0, B_mat, ldB);
 	
-	// Only the ndiis * ndiis block in the bottom-right corner of R^T * R
-	// is non-zero, so we use this part to solve for DIIS coefficients
-	int diis_spos   = MAX_DIIS - ndiis;
-	int num_equ     = ndiis + 1;
-	double *B_ptr   = B_mat + diis_spos * ldB + diis_spos;
-	double *rhs_ptr = DIIS_rhs  + diis_spos;
-	// Solve B * c = rhs with B_ptr, B_ptr will be overwritten as P * L * U, 
-	// rhs_ptr will be overwritten as solution, ipiv is the permuation info
-	LAPACKE_dgesv(LAPACK_ROW_MAJOR, num_equ, 1, B_ptr, ldB, ipiv, rhs_ptr, 1);
+	// FDS = F * D * S;
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf,
+				1.0, F_mat, nbf, D_mat, nbf, 0.0, tmp_mat, nbf);
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf,
+				1.0, tmp_mat, nbf, S_mat, nbf, 0.0, FDS_mat, nbf);
 	
-	// Reconstruct F_mat, F_new = \sum_{i} c(i) * F0(:, i);
+	// Residual = X^T * (FDS - FDS^T) * X
+	// Use tmp_mat to store FDS - FDS^T
+	mkl_domatadd('R', 'N', 'T', nbf, nbf, 1.0, FDS_mat, nbf, -1.0, FDS_mat, nbf, tmp_mat, nbf);
+	// Use FDS_mat to store X^T * (FDS - FDS^T)
+	cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, nbf, nbf, nbf,
+				1.0, X_mat, nbf, tmp_mat, nbf, 0.0, FDS_mat, nbf);
+	// Use tmp_mat to store X^T * (FDS - FDS^T) * X
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf,
+				1.0, FDS_mat, nbf, X_mat, nbf, 0.0, tmp_mat, nbf);
+	
+	// In my MATLAB code, F_mat and its residual are treated as column vectors
+	// For performance, we treat them as row vectors here
+	
+	// R(:, DIIS_idx) = X^T * (FDS - FDS^T) * X
+	// B(i, j) = R(:, i) * R(:, j)
+	// DIIS_rhs is not used yet, use it to store dot product results
+	double *DIIS_dot = DIIS_rhs; 
+	memset(DIIS_dot, 0, DBL_SIZE * (MAX_DIIS + 1));
+	memcpy(R_mat + mat_size * DIIS_idx, tmp_mat, mat_mem_size);
+	double *Ri = R_mat + mat_size * DIIS_idx;
+	for (int j = 0; j < TinySCF->DIIS_len; j++)
+	{
+		double *Rj = R_mat + mat_size * j;
+		DIIS_dot[j] = cblas_ddot(mat_size, Ri, 1, Rj, 1);
+	}
+	
+	// Construct symmetric B
+	// B(DIIS_idx, 1 : DIIS_len) = DIIS_dot(1 : DIIS_idx);
+	// B(1 : DIIS_len, DIIS_idx) = DIIS_dot(1 : DIIS_idx);
+	for (int i = 0; i < TinySCF->DIIS_len; i++)
+	{
+		B_mat[DIIS_idx * ldB + i] = DIIS_dot[i];
+		B_mat[i * ldB + DIIS_idx] = DIIS_dot[i];
+	}
+	
+	// Pick an old F that its residual has the largest 2-norm
+	for (int i = 0; i < TinySCF->DIIS_len; i++)
+	{
+		if (B_mat[i * ldB + i] > TinySCF->DIIS_bmax)
+		{
+			TinySCF->DIIS_bmax    = B_mat[i * ldB + i];
+			TinySCF->DIIS_bmax_id = i;
+		}
+	}
+	
+	// F := X^T * F * X, F0(:, DIIS_idx) = F
+	// Use tmp_mat to store X^T * F
+	cblas_dgemm(CblasRowMajor, CblasTrans, CblasNoTrans, nbf, nbf, nbf, 
+				1.0, X_mat, nbf, F_mat, nbf, 0.0, tmp_mat, nbf);
+	// Use F_mat to store X^T * F * X
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
+				1.0, tmp_mat, nbf, X_mat, nbf, 0.0, F_mat, nbf);
+	// Copy to F0
+	memcpy(F0_mat + mat_size * DIIS_idx, F_mat, mat_mem_size);
+	
+	// Solve the linear system 
+	memset(DIIS_rhs, 0, DBL_SIZE * (MAX_DIIS + 1));
+	DIIS_rhs[TinySCF->DIIS_len] = -1;
+	// Copy B_mat to tmp_mat, since LAPACKE_dgesv will overwrite the input matrix
+	memcpy(tmp_mat, B_mat, DBL_SIZE * ldB * ldB);  
+	LAPACKE_dgesv(LAPACK_ROW_MAJOR, TinySCF->DIIS_len + 1, 1, tmp_mat, ldB, ipiv, DIIS_rhs, 1);
+	
+	// Form new X^T * F * X
 	memset(F_mat, 0, mat_mem_size);
-	for (int i = diis_spos; i < MAX_DIIS; i++)
+	for (int i = 0; i < TinySCF->DIIS_len; i++)
 		cblas_daxpy(mat_size, DIIS_rhs[i], F0_mat + i * mat_size, 1, F_mat, 1);
 }
