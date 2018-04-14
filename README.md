@@ -14,7 +14,7 @@ Current status:
 
 ![](https://img.shields.io/badge/SAD%20initial%20guess-ready-brightgreen.svg)
 
-![](https://img.shields.io/badge/DIIS%20acceleration-problematic-yellow.svg)
+![](https://img.shields.io/badge/DIIS%20acceleration-naive-green.svg)
 
 ![](https://img.shields.io/badge/OpenMP%20parallelization-ready-brightgreen.svg)
 

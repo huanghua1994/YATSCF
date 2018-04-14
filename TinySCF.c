@@ -108,6 +108,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->J_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
 	TinySCF->K_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
 	TinySCF->X_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->tmp_mat   = (double*) ALIGN64B_MALLOC(mat_mem_size);
 	TinySCF->Cocc_mat  = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->n_occ * TinySCF->nbasfuncs);
 	TinySCF->eigval    = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nbasfuncs);
 	TinySCF->ev_idx    = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nbasfuncs);
@@ -118,10 +119,11 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	assert(TinySCF->J_mat     != NULL);
 	assert(TinySCF->K_mat     != NULL);
 	assert(TinySCF->X_mat     != NULL);
+	assert(TinySCF->tmp_mat   != NULL);
 	assert(TinySCF->Cocc_mat  != NULL);
 	assert(TinySCF->eigval    != NULL);
 	assert(TinySCF->eigval    != NULL);
-	TinySCF->mem_size += 7 * mat_mem_size;
+	TinySCF->mem_size += 8 * mat_mem_size;
 	TinySCF->mem_size += DBL_SIZE * TinySCF->n_occ * TinySCF->nbasfuncs;
 	TinySCF->mem_size += (DBL_SIZE + INT_SIZE) * TinySCF->nbasfuncs;
 
@@ -177,6 +179,7 @@ void free_TinySCF(TinySCF_t TinySCF)
 	ALIGN64B_FREE(TinySCF->J_mat);
 	ALIGN64B_FREE(TinySCF->K_mat);
 	ALIGN64B_FREE(TinySCF->X_mat);
+	ALIGN64B_FREE(TinySCF->tmp_mat);
 	ALIGN64B_FREE(TinySCF->Cocc_mat);
 	ALIGN64B_FREE(TinySCF->eigval);
 	ALIGN64B_FREE(TinySCF->ev_idx);
@@ -235,12 +238,13 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 	
 	// Construct basis transformation 
 	int N = TinySCF->nbasfuncs;
-	double *U_mat  = TinySCF->S_mat;  // We don't need S_mat matrix any more
-	double *U_mat0 = TinySCF->K_mat;  // K_mat is not used currently, use it as a temporary matrix
+	double *U_mat  = TinySCF->tmp_mat; 
+	double *U_mat0 = TinySCF->K_mat;    // K_mat is not used currently, use it as a temporary matrix
 	double *eigval = TinySCF->eigval;
 	// [U, D] = eig(S);
+	memcpy(U_mat, TinySCF->S_mat, DBL_SIZE * TinySCF->mat_size);
 	LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', N, U_mat, N, eigval); // U_mat will be overwritten by eigenvectors
-	// X = U * D^{-1/2} * U'
+	// X = U * D^{-1/2} * U'^T
 	memcpy(U_mat0, U_mat, DBL_SIZE * TinySCF->mat_size);
 	for (int i = 0; i < N; i++) 
 		eigval[i] = 1.0 / sqrt(eigval[i]);
@@ -341,7 +345,6 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 
 void TinySCF_get_initial_guess(TinySCF_t TinySCF)
 {
-	// TODO: use CInt_getInitialGuess() to get initial guess
 	memset(TinySCF->D_mat, 0, DBL_SIZE * TinySCF->mat_size);
 	
 	double *guess;

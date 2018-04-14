@@ -46,7 +46,7 @@ struct TinySCF_struct
 	
 	// Matrices and temporary arrays in SCF
 	double *Hcore_mat;    // Core Hamiltonian matrix
-	double *S_mat;        // Overlap matrix   (no longer needed once X_mat is obtained)
+	double *S_mat;        // Overlap matrix
 	double *F_mat;        // Fock matrix
 	double *D_mat;        // Density matrix
 	double *J_mat;        // Coulomb matrix   ((J+J^T)/2 is the actual Coulomb matrix)
@@ -55,6 +55,7 @@ struct TinySCF_struct
 	double *Cocc_mat;     // Temporary matrix for building density matrix
 	double *eigval;       // Eigenvalues for building density matrix
 	int    *ev_idx;       // Index of eigenvalues, for sorting
+	double *tmp_mat;      // Temporary matrix
 	
 	// Matrices and arrays for DIIS
 	double *F0_mat;       // Previous Fock matrices

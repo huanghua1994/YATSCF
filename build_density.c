@@ -36,11 +36,10 @@ static void quickSort(double *eigval, int *ev_idx, int l, int r)
 
 void TinySCF_build_DenMat(TinySCF_t TinySCF)
 {
-	// To save some memory, we use the space of F_mat and S_mat as temporary arrays
 	double *F_mat    = TinySCF->F_mat;
 	double *X_mat    = TinySCF->X_mat;
 	double *D_mat    = TinySCF->D_mat;
-	double *C_mat    = TinySCF->S_mat;
+	double *C_mat    = TinySCF->tmp_mat;
 	double *Cocc_mat = TinySCF->Cocc_mat;
 	double *eigval   = TinySCF->eigval;
 	int    *ev_idx   = TinySCF->ev_idx;
