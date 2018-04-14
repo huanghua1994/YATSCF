@@ -36,7 +36,6 @@
 #define SLEN         5
 #define MAXNS        3
 #define MAXATOMNAME  2
-//#define A2BOHR       1.889726
 #define A2BOHR       (1.0/0.52917720859)
 #define CARTESIAN    0
 #define SPHERICAL    1
@@ -55,10 +54,7 @@ static char etable[ELEN][MAXATOMNAME + 1] =
   "Pd", "Ag", "Cd", "In", "Sn"
 };
 
-static char mtable[SLEN] =
-{
-  'S',  'P', 'D', 'F', 'G' 
-};
+static char mtable[SLEN] = {'S',  'P', 'D', 'F', 'G'};
 
 
 /* Normalize the shells
@@ -68,7 +64,7 @@ static char mtable[SLEN] =
  * Recognizes shells with zero orbital exponent.
  * Code is a good example of looping through elements of a basis set.
  */
-static void normalization (BasisSet_t basis)
+static void normalization(BasisSet_t basis)
 {
     double sum;
     double temp;
@@ -132,29 +128,6 @@ static void normalization (BasisSet_t basis)
     }    
 }
 
-
-void _maxMomentum (BasisSet_t basis, int *max_momentum)
-{
-    *max_momentum = basis->max_momentum;
-}
-
-
-void _maxPrimid (BasisSet_t basis, int *max_primid)
-{
-    *max_primid = basis->max_nexp_id;
-}
-
-
-void _maxnumExp (BasisSet_t basis, int *max_nexp)
-{
-    *max_nexp = basis->max_nexp;   
-}
-
-
-#ifdef __INTEL_OFFLOAD
-#pragma offload_attribute(push, target(mic))
-#endif
-
 static inline double vector_min(size_t length, const double vector[restrict static length]) {
     double result = vector[0];
     for (size_t i = 1; i < length; i++) {
@@ -164,66 +137,59 @@ static inline double vector_min(size_t length, const double vector[restrict stat
     return result;
 }
 
-
-CIntStatus_t CInt_createBasisSet (BasisSet_t *_basis)
+CIntStatus_t CInt_createBasisSet(BasisSet_t *_basis)
 {
     BasisSet_t basis;
-    basis = (BasisSet_t )malloc (sizeof(struct BasisSet));
+    basis = (BasisSet_t) malloc(sizeof(struct BasisSet));
     CINT_ASSERT(basis != NULL);
-    memset (basis, 0, sizeof(struct BasisSet));
+    memset(basis, 0, sizeof(struct BasisSet));
 
     *_basis = basis;
     return CINT_STATUS_SUCCESS;
 }
 
-
-CIntStatus_t CInt_destroyBasisSet (BasisSet_t basis)
+CIntStatus_t CInt_destroyBasisSet(BasisSet_t basis)
 {
-    free (basis->f_start_id);
-    free (basis->f_end_id);
+    free(basis->f_start_id);
+    free(basis->f_end_id);
 
     for (int i = 0; i < basis->bs_nshells; i++)
     {
-        ALIGNED_FREE (basis->bs_cc[i]);
-        ALIGNED_FREE (basis->bs_exp[i]);
-        ALIGNED_FREE (basis->bs_norm[i]);
+        ALIGNED_FREE(basis->bs_cc[i]);
+        ALIGNED_FREE(basis->bs_exp[i]);
+        ALIGNED_FREE(basis->bs_norm[i]);
     }
-    free (basis->bs_cc);
-    free (basis->bs_exp);
-    free (basis->bs_norm);
+    free(basis->bs_cc);
+    free(basis->bs_exp);
+    free(basis->bs_norm);
 
     if (basis->guess != NULL)
     {
-        for (int i = 0; i < basis->bs_natoms; i++)
-        {
-            free (basis->guess[i]);
-        }
-        free (basis->guess);
+        for (int i = 0; i < basis->bs_natoms; i++) free(basis->guess[i]);
+        free(basis->guess);
     }    
-    free (basis->eid);
-    free (basis->xn);
-    free (basis->yn);
-    free (basis->zn);   
-    free (basis->charge);
-    free (basis->bs_eptr);
-    free (basis->bs_atom_start);
-    free (basis->bs_nexp);
-    free (basis->bs_momentum);
-    free (basis->cc);
-    free (basis->exp);
-    free (basis->minexp);
-    free (basis->norm);
-
-    free (basis);
+    free(basis->eid);
+    free(basis->xn);
+    free(basis->yn);
+    free(basis->zn);   
+    free(basis->charge);
+    free(basis->bs_eptr);
+    free(basis->bs_atom_start);
+    free(basis->bs_nexp);
+    free(basis->bs_momentum);
+    free(basis->cc);
+    free(basis->exp);
+    free(basis->minexp);
+    free(basis->norm);
+	
+    free(basis);
 
     return CINT_STATUS_SUCCESS;
 }
 
 
-/* Create the data structure of the shells for the given molecule.
- *
- */
-CIntStatus_t parse_molecule (BasisSet_t basis)
+// Create the data structure of the shells for the given molecule.
+CIntStatus_t CInt_parse_molecule(BasisSet_t basis)
 {
     int natoms;
     int nshells;   
@@ -330,101 +296,6 @@ CIntStatus_t parse_molecule (BasisSet_t basis)
     return CINT_STATUS_SUCCESS;
 }
 
-
-CIntStatus_t CInt_unpackBasisSet (BasisSet_t basis, void *buf)
-{
-    CIntStatus_t ret;
-    char *_buf = (char *)buf;
-    int offset = 0;
-    memcpy(&(basis->Q), &(_buf[offset]), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(basis->natoms), &(_buf[offset]), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(basis->nelectrons), &(_buf[offset]), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(basis->bs_natoms), &(_buf[offset]), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(basis->basistype), &(_buf[offset]), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(basis->bs_nshells), &(_buf[offset]), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(basis->bs_totnexp), &(_buf[offset]), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(basis->bs_nelements), &(_buf[offset]), sizeof(int));
-    offset += sizeof(int);
-    basis->xn = (double *)malloc(sizeof(double) * basis->natoms);
-    basis->yn = (double *)malloc(sizeof(double) * basis->natoms);
-    basis->zn = (double *)malloc(sizeof(double) * basis->natoms);
-    basis->charge = (double *)malloc(sizeof(double) * basis->natoms); 
-    basis->eid = (int *)malloc(sizeof(int) * basis->natoms);
-    CINT_ASSERT(basis->xn != NULL);
-    CINT_ASSERT(basis->yn != NULL);
-    CINT_ASSERT(basis->zn != NULL);
-    CINT_ASSERT(basis->charge != NULL);
-    CINT_ASSERT(basis->eid != NULL);
-    memcpy(basis->xn, &(_buf[offset]), sizeof(double) * basis->natoms);
-    offset += sizeof(double) * basis->natoms;
-    memcpy(basis->yn, &(_buf[offset]), sizeof(double) * basis->natoms);
-    offset += sizeof(double) * basis->natoms;
-    memcpy(basis->zn, &(_buf[offset]), sizeof(double) * basis->natoms);
-    offset += sizeof(double) * basis->natoms;
-    memcpy(basis->charge, &(_buf[offset]), sizeof(double) * basis->natoms);
-    offset += sizeof(double) * basis->natoms;
-    memcpy(basis->eid, &(_buf[offset]), sizeof(int) * basis->natoms);
-    offset += sizeof(int) * basis->natoms;
-    basis->bs_cc = (double **)malloc(sizeof(double *) * basis->bs_nshells);
-    basis->bs_exp = (double **)malloc(sizeof(double *) * basis->bs_nshells);
-    basis->bs_norm = (double **)malloc(sizeof(double *) * basis->bs_nshells);
-    basis->bs_eptr = (int *)malloc(sizeof(int) * basis->bs_nelements);
-    basis->bs_atom_start = (int *)malloc(sizeof(int) * (basis->bs_natoms + 1)); 
-    basis->bs_momentum = (int *)malloc(sizeof(int) * basis->bs_nshells);
-    basis->bs_nexp = (int *)malloc(sizeof(int) * basis->bs_nshells);
-    CINT_ASSERT(basis->bs_cc != NULL);
-    CINT_ASSERT(basis->bs_exp != NULL);
-    CINT_ASSERT(basis->bs_norm != NULL);
-    CINT_ASSERT(basis->bs_eptr != NULL);
-    CINT_ASSERT(basis->bs_atom_start != NULL);
-    CINT_ASSERT(basis->bs_momentum != NULL);
-    CINT_ASSERT(basis->bs_nexp != NULL);
-
-    memcpy(basis->bs_nexp, &(_buf[offset]), sizeof(int) * basis->bs_nshells);
-    offset += sizeof(int) * basis->bs_nshells;
-    for (int i = 0; i < basis->bs_nshells; i++) {
-        int nexp = basis->bs_nexp[i];
-        basis->bs_cc[i] = (double *)ALIGNED_MALLOC(sizeof(double) * nexp);
-        basis->bs_exp[i] = (double *)ALIGNED_MALLOC(sizeof(double) * nexp);
-        basis->bs_norm[i] = (double *)ALIGNED_MALLOC(sizeof(double) * nexp);
-        CINT_ASSERT(basis->bs_cc[i] != NULL);
-        CINT_ASSERT(basis->bs_exp[i] != NULL);
-        CINT_ASSERT(basis->bs_norm[i] != NULL);
-        memcpy(basis->bs_exp[i], &(_buf[offset]), sizeof(double) * nexp);
-        offset += sizeof(double) * nexp;
-        memcpy(basis->bs_cc[i], &(_buf[offset]), sizeof(double) * nexp);
-        offset += sizeof(double) * nexp;
-        memcpy(basis->bs_norm[i], &(_buf[offset]), sizeof(double) * nexp);
-        offset += sizeof(double) * nexp;
-    }
-    memcpy(basis->bs_eptr, &(_buf[offset]), sizeof(int) * basis->bs_nelements);
-    offset += sizeof(int) * basis->bs_nelements;
-    memcpy(basis->bs_atom_start, &(_buf[offset]),
-           sizeof(int) * (basis->bs_natoms + 1));
-    offset += sizeof(int) * (basis->bs_natoms + 1);
-    memcpy(basis->bs_momentum, &(_buf[offset]), sizeof(int) * basis->bs_nshells);
-    offset += sizeof(int) * basis->bs_nshells;
-
-    if ((ret = parse_molecule(basis)) != CINT_STATUS_SUCCESS) {
-        return ret;
-    }
-
-    return CINT_STATUS_SUCCESS;    
-}
-
-
-#ifdef __INTEL_OFFLOAD
-#pragma offload_attribute(pop)
-#endif
-
-
 /* Read the xyz file and put data into the BasisSet_t structure.
  * 
  * Net charge is read from comment line of xyz file.
@@ -434,7 +305,7 @@ CIntStatus_t CInt_unpackBasisSet (BasisSet_t basis, void *buf)
  * Nuclear energy is computed and stored in basis->ene_nuc;
  * Warning: check that your xyz file does not use Fortran scientific notation.
  */
-CIntStatus_t import_molecule (char *file, BasisSet_t basis)
+CIntStatus_t CInt_import_molecule(char *file, BasisSet_t basis)
 {
     FILE *fp;
     char line[1024];
@@ -562,7 +433,7 @@ CIntStatus_t import_molecule (char *file, BasisSet_t basis)
  *
  * Handle sp shells by splitting them into separate s and p shells
  */
-CIntStatus_t import_basis (char *file, BasisSet_t basis)
+CIntStatus_t CInt_import_basis(char *file, BasisSet_t basis)
 {
     FILE *fp;
     char line[1024];
@@ -777,7 +648,7 @@ CIntStatus_t import_basis (char *file, BasisSet_t basis)
  * found (e.g., does not match number of functions because it is for a 
  * different basis set), then a zero initial guess for that atom is used.
  */
-CIntStatus_t import_guess(char *file, BasisSet_t basis)
+CIntStatus_t CInt_import_guess(char *file, BasisSet_t basis)
 {
     char *dir;
     if (file != NULL) {
@@ -866,334 +737,122 @@ end:
     return CINT_STATUS_SUCCESS;
 }
 
-
-CIntStatus_t CInt_packBasisSet (BasisSet_t basis,
-                                void **buf,
-                                int *bufsize)
-{
-    int _bufsize;
-    char *_buf;
-    int offset;
-    int i;
-    int nexp;
-    
-    _bufsize = 6 * sizeof(int) + (4 * basis->natoms) * sizeof(double) +                
-               (2 * basis->bs_nshells + basis->bs_nelements + basis->natoms
-                + basis->bs_natoms + 3) * sizeof(int) +
-                basis->bs_totnexp * 3 * sizeof(double);
-    _buf = (char *)malloc(_bufsize);
-    assert(_buf != NULL);
-    offset = 0;
-    memcpy(&(_buf[offset]), &(basis->Q), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(_buf[offset]), &(basis->natoms), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(_buf[offset]), &(basis->nelectrons), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(_buf[offset]), &(basis->bs_natoms), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(_buf[offset]), &(basis->basistype), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(_buf[offset]), &(basis->bs_nshells), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(_buf[offset]), &(basis->bs_totnexp), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(_buf[offset]), &(basis->bs_nelements), sizeof(int));
-    offset += sizeof(int);
-    memcpy(&(_buf[offset]), basis->xn, sizeof(double) * basis->natoms);
-    offset += sizeof(double) * basis->natoms;
-    memcpy(&(_buf[offset]), basis->yn, sizeof(double) * basis->natoms);
-    offset += sizeof(double) * basis->natoms;
-    memcpy(&(_buf[offset]), basis->zn, sizeof(double) * basis->natoms);
-    offset += sizeof(double) * basis->natoms;
-    memcpy(&(_buf[offset]), basis->charge, sizeof(double) * basis->natoms);
-    offset += sizeof(double) * basis->natoms;
-    memcpy(&(_buf[offset]), basis->eid, sizeof(int) * basis->natoms);
-    offset += sizeof(int) * basis->natoms;
-    memcpy(&(_buf[offset]), basis->bs_nexp, sizeof(int) * basis->bs_nshells);
-    offset += sizeof(int) * basis->bs_nshells;
-    for (i = 0; i < basis->bs_nshells; i++)
-    {
-        nexp = basis->bs_nexp[i];
-        memcpy(&(_buf[offset]), basis->bs_exp[i], sizeof(double) * nexp);
-        offset += sizeof(double) * nexp;
-        memcpy(&(_buf[offset]), basis->bs_cc[i], sizeof(double) * nexp);
-        offset += sizeof(double) * nexp;
-        memcpy(&(_buf[offset]), basis->bs_norm[i], sizeof(double) * nexp);
-        offset += sizeof(double) * nexp;
-        assert (offset < _bufsize);
-    }
-    memcpy(&(_buf[offset]), basis->bs_eptr, sizeof(int) * basis->bs_nelements);
-    offset += sizeof(int) * basis->bs_nelements;
-    memcpy(&(_buf[offset]), basis->bs_atom_start,
-           sizeof(int) * (basis->bs_natoms + 1));
-    offset += sizeof(int) * (basis->bs_natoms + 1);
-    memcpy(&(_buf[offset]), basis->bs_momentum, sizeof(int) * basis->bs_nshells);
-    offset += sizeof(int) * basis->bs_nshells;
-    
-    assert (offset == _bufsize);
-
-    *bufsize = _bufsize;
-    *buf = (void *)_buf;
-
-    return CINT_STATUS_SUCCESS; 
-}
-
-
-CIntStatus_t CInt_importBasisSet(BasisSet_t basis,
-                                 int natoms, int *Zs,
-                                 double *X, double *Y, double *Z,
-                                 int nprims, int nshells, int pure,
-                                 int *shells_p_atom,
-                                 int *prims_p_shell,
-                                 int *L, double *cc, double *alpha)
-{
-    // import basis
-    basis->bs_natoms = natoms;
-    basis->bs_nshells = nshells;
-    basis->bs_totnexp = nprims;
-    if (pure == 0) {
-        basis->basistype = CARTESIAN;
-    } else if (pure == 1) {
-        basis->basistype = SPHERICAL;
-    } else {
-        CINT_PRINTF(1, "pure must be 0 or 1\n");
-        return CINT_STATUS_INVALID_VALUE;
-    }
-    basis->bs_nelements = basis->bs_natoms;
-    CINT_ASSERT(natoms > 0);
-    CINT_ASSERT(nshells > 0);
-    CINT_ASSERT(nprims > 0);
-    
-    basis->bs_eptr = (int *)malloc(sizeof(int) * basis->bs_nelements);
-    basis->bs_atom_start = (int *)malloc(sizeof(int) * (natoms + 1));
-    basis->bs_nexp = (int *)malloc(sizeof(int) * nshells);
-    basis->bs_cc = (double **)malloc(sizeof(double *) * nshells);
-    basis->bs_norm = (double **)malloc(sizeof(double *) * nshells);
-    basis->bs_exp = (double **)malloc(sizeof(double *) * nshells);
-    basis->bs_momentum = (int *)malloc(sizeof(int) * nshells);
-    basis->bs_eid = (int *)malloc(sizeof(int) * natoms);
-    CINT_ASSERT(basis->bs_eptr != NULL);
-    CINT_ASSERT(basis->bs_atom_start != NULL);
-    CINT_ASSERT(basis->bs_nexp != NULL);
-    CINT_ASSERT(basis->bs_cc != NULL);
-    CINT_ASSERT(basis->bs_norm != NULL);
-    CINT_ASSERT(basis->bs_exp != NULL);
-    CINT_ASSERT(basis->bs_momentum != NULL);
-    CINT_ASSERT(basis->bs_eid != NULL);
-
-    basis->bs_atom_start[0] = 0;
-    int start_prim = 0;
-    int num_prims = 0;
-    for (int i = 0; i < basis->bs_natoms; i++) {
-        basis->bs_eptr[i] = i;
-        basis->bs_eid[i] = i;
-        basis->bs_atom_start[i + 1] =
-            basis->bs_atom_start[i] + shells_p_atom[i];
-        int start_shell = basis->bs_atom_start[i];
-        int end_shell = basis->bs_atom_start[i + 1];    
-        for (int j = start_shell; j < end_shell; j++) {
-            CINT_ASSERT(j < nshells);
-            int nexp = prims_p_shell[j];
-            basis->bs_nexp[j] = nexp;
-            basis->bs_momentum[j] = L[j];
-            // copy cc, alpha and norm
-            basis->bs_cc[j] =
-                (double *)ALIGNED_MALLOC(sizeof(double) * nexp);
-            basis->bs_exp[j] =
-                (double *)ALIGNED_MALLOC(sizeof(double) * nexp);
-            basis->bs_norm[j] =
-                (double *)ALIGNED_MALLOC(sizeof(double) * nexp);
-            CINT_ASSERT(basis->bs_cc[j] != NULL);
-            CINT_ASSERT(basis->bs_exp[j] != NULL);
-            CINT_ASSERT(basis->bs_norm[j] != NULL);
-            memcpy(basis->bs_cc[j], &cc[start_prim], sizeof(double) * nexp);
-            memcpy(basis->bs_exp[j], &alpha[start_prim], sizeof(double) * nexp);
-            start_prim += nexp;
-            num_prims += nexp;           
-        }
-    }
-    CINT_ASSERT(num_prims == basis->bs_totnexp);
-    normalization(basis);
-    
-    // import molecule
-    basis->natoms = natoms;
-    basis->xn = (double *)malloc(sizeof(double) * basis->natoms);
-    basis->yn = (double *)malloc(sizeof(double) * basis->natoms);
-    basis->zn = (double *)malloc(sizeof(double) * basis->natoms);
-    basis->charge = (double *)malloc(sizeof(double) * basis->natoms); 
-    basis->eid = (int *)malloc(sizeof(int) * basis->natoms);
-    if (NULL == basis->xn ||
-        NULL == basis->yn ||
-        NULL == basis->zn ||
-        NULL == basis->charge ||
-        NULL == basis->eid) {
-        CINT_PRINTF(1, "memory allocation failed\n");
-        return CINT_STATUS_ALLOC_FAILED;
-    }
-    memcpy(basis->xn, X, sizeof(double) * basis->natoms);
-    memcpy(basis->yn, Y, sizeof(double) * basis->natoms);
-    memcpy(basis->zn, Z, sizeof(double) * basis->natoms);
-    basis->nelectrons = 0;
-    for (int i = 0; i < natoms; i++) {
-        basis->eid[i] = i + 1;
-        basis->charge[i] = (double)(Zs[i]);
-        basis->nelectrons += Zs[i];
-    }
-    // compute nuc energy
-    double ene = 0.0;
-    for (int A = 0; A < natoms; A++) {
-        for (int B = A + 1; B < natoms; B++) {
-            double dx = basis->xn[A] - basis->xn[B];
-            double dy = basis->yn[A] - basis->yn[B];
-            double dz = basis->zn[A] - basis->zn[B];
-            double R = sqrt(dx * dx + dy * dy + dz * dz);
-            ene += basis->charge[A] * basis->charge[B] / R;
-        }
-    }
-    basis->ene_nuc = ene;
-    // parse molecule
-    CIntStatus_t status;
-    // parse xyz
-    if ((status = parse_molecule(basis)) != CINT_STATUS_SUCCESS)
-    {
-        return status;
-    }
-
-    // import guess
-    if ((status = import_guess(NULL, basis)) != CINT_STATUS_SUCCESS)
-    {
-        return status;
-    }
-
-
-    return CINT_STATUS_SUCCESS;
-}
-
-
-CIntStatus_t CInt_loadBasisSet (BasisSet_t basis, char *bsfile, char *molfile)
+CIntStatus_t CInt_loadBasisSet(BasisSet_t basis, char *bsfile, char *molfile)
 {
     CIntStatus_t status;
 
     // read xyz file
-    if ((status = import_molecule (molfile, basis)) != CINT_STATUS_SUCCESS)
-    {
-        return status;
-    }
+	status = CInt_import_molecule(molfile, basis);
+    if (status != CINT_STATUS_SUCCESS) return status;
+
     // read basis set
-    if ((status = import_basis (bsfile, basis)) != CINT_STATUS_SUCCESS)
-    {
-        return status;
-    }
+	status = CInt_import_basis(bsfile, basis);
+    if (status != CINT_STATUS_SUCCESS) return status;
     
     // parse xyz
-    if ((status = parse_molecule (basis)) != CINT_STATUS_SUCCESS)
-    {
-        return status;
-    }
+	status = CInt_parse_molecule(basis);
+	if (status != CINT_STATUS_SUCCESS) return status;
 
     // import guess
-    if ((status = import_guess (bsfile, basis)) != CINT_STATUS_SUCCESS)
-    {
-        return status;
-    }
+	status = CInt_import_guess(bsfile, basis);
+	if (status != CINT_STATUS_SUCCESS) return status;
     
     return CINT_STATUS_SUCCESS;
 }
 
-
-int CInt_getNumShells (BasisSet_t basis)
+int CInt_getNumAtoms(BasisSet_t basis)
 {
-    return (basis->nshells);
+	return basis->natoms;
 }
 
-
-int CInt_getNumFuncs (BasisSet_t basis)
+int CInt_getNumShells(BasisSet_t basis)
 {
-    return (basis->nfunctions);
+	return basis->nshells;
 }
 
-
-int CInt_getNumAtoms (BasisSet_t basis)
+int CInt_getNumFuncs(BasisSet_t basis)
 {
-    return (basis->natoms);
+	return basis->nfunctions;
 }
 
+int CInt_getNumOccOrb(BasisSet_t basis)
+{
+	return ((basis->nelectrons - basis->Q)/2);
+}
 
-void CInt_getShellxyz ( BasisSet_t basis,
-                        int shellid,
-                        double *x,
-                        double *y,
-                        double *z )
+int CInt_getFuncStartInd(BasisSet_t basis, int shellid)
+{
+	return basis->f_start_id[shellid];
+}
+
+int CInt_getFuncEndInd(BasisSet_t basis, int shellid)
+{
+	return basis->f_end_id[shellid];
+}
+
+int CInt_getShellDim(BasisSet_t basis, int shellid)
+{
+	return (basis->f_end_id[shellid] - basis->f_start_id[shellid] + 1);
+}
+
+int CInt_getMaxShellDim(BasisSet_t basis)
+{
+	return basis->maxdim;
+}
+
+int CInt_getAtomStartInd(BasisSet_t basis, int atomid)
+{
+	return basis->s_start_id[atomid];
+}
+
+int CInt_getAtomEndInd(BasisSet_t basis, int atomid)
+{
+	return basis->s_start_id[atomid + 1] - 1;
+}
+
+int CInt_getTotalCharge(BasisSet_t basis)
+{
+	return basis->Q;
+}
+
+int CInt_getNneutral(BasisSet_t basis)
+{
+	return basis->nelectrons;
+}
+
+int CInt_getMaxMomentum(BasisSet_t basis)
+{
+	return basis->max_momentum;
+}
+
+int CInt_getMaxPrimid(BasisSet_t basis)
+{
+	return basis->max_nexp_id;
+}
+
+int CInt_getMaxnumExp(BasisSet_t basis)
+{
+	return basis->max_nexp;   
+}
+
+double CInt_getNucEnergy(BasisSet_t basis)
+{
+	return basis->ene_nuc;
+}
+
+void CInt_getInitialGuess(BasisSet_t basis, int atomid, double **guess, int *spos, int *epos)
+{
+	const int eid = basis->eid[atomid] - 1;
+	const int start_shell = basis->s_start_id[atomid];
+	const int end_shell = basis->s_start_id[atomid + 1];
+	*guess = basis->guess[basis->bs_eptr[eid]];
+	*spos  = basis->f_start_id[start_shell];
+	*epos  = basis->f_end_id[end_shell - 1];
+}
+
+void CInt_getShellxyz(BasisSet_t basis, int shellid, double *x, double *y, double *z)
 {
     *x = basis->xyz0[shellid*4 + 0];
     *y = basis->xyz0[shellid*4 + 1];
     *z = basis->xyz0[shellid*4 + 2];
-}
-
-
-int CInt_getShellDim (BasisSet_t basis, int shellid)
-{
-    return (basis->f_end_id[shellid] -
-        basis->f_start_id[shellid] + 1);
-}
-
-
-int CInt_getFuncStartInd (BasisSet_t basis, int shellid)
-{
-    return (basis->f_start_id[shellid]);
-}
-
-
-int CInt_getMaxShellDim (BasisSet_t basis)
-{
-    return (basis->maxdim);
-}
-
-
-int CInt_getNumOccOrb (BasisSet_t basis)
-{
-    return ((basis->nelectrons - basis->Q)/2);
-}
-
-
-int CInt_getFuncEndInd (BasisSet_t basis, int shellid)
-{
-    return (basis->f_end_id[shellid]);
-}
-
-
-int CInt_getAtomStartInd (BasisSet_t basis, int atomid)
-{
-    return (basis->s_start_id[atomid]);
-}
-
-
-void CInt_getInitialGuess (BasisSet_t basis, int atomid, double **guess,
-                           int *spos, int *epos)
-{
-    const int eid = basis->eid[atomid] - 1;
-    *guess = basis->guess[basis->bs_eptr[eid]];
-    const int start_shell = basis->s_start_id[atomid];
-    const int end_shell = basis->s_start_id[atomid + 1];
-    *spos = basis->f_start_id[start_shell];
-    *epos = basis->f_end_id[end_shell - 1];
-}
-
-
-int CInt_getTotalCharge(BasisSet_t basis)
-{
-    return basis->Q;
-}
-
-
-int CInt_getNneutral(BasisSet_t basis)
-{
-    return basis->nelectrons;
-}
-
-
-double CInt_getNucEnergy (BasisSet_t basis)
-{
-    return basis->ene_nuc;
 }

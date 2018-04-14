@@ -21,36 +21,11 @@
 #include <assert.h>
 #include <math.h>
 
-#include <simint/simint.h>
-#include <CInt.h>
-#include <cint_basisset.h>
-#include <cint_config.h>
-#include <cint_def.h>
-
-
-struct SIMINT
-{
-    int nthreads;
-    int max_am;
-    int workmem_per_thread;
-    int outmem_per_thread;
-    double *workbuf;
-    double *outbuf;
-
-    int nshells;
-    struct simint_shell *shells;
-    struct simint_multi_shellpair *shellpairs;
-
-    int    screen_method;
-    double screen_tol;
-
-    // For timer, only master thread will write to these
-    double ostei_actual, ostei_setup, fock_update_F;
-
-    // For statistic
-    double *num_multi_shellpairs, *sum_nprim;
-    double *num_screened_prim, *num_unscreened_prim, *num_screened_vec, *num_unscreened_vec;
-};
+#include "simint/simint.h"
+#include "CInt.h"
+#include "cint_basisset.h"
+#include "cint_config.h"
+#include "cint_simint.h"
 
 // CInt_createSIMINT is called by all nodes.
 // All nodes have a copy of the BasisSet_t structure here and will form and 

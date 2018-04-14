@@ -9,7 +9,6 @@
 #include <mkl.h>
 
 #include "CInt.h"
-#include "cint_basisset.h"
 #include "utils.h"
 #include "TinySCF.h"
 #include "build_Fock.h"
@@ -55,7 +54,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	
 	// Initialize OpenMP parallel info and buffer
 	int maxAM, max_buf_entry_size, total_buf_size;
-	_maxMomentum(TinySCF->basis, &maxAM);
+	maxAM = CInt_getMaxMomentum(TinySCF->basis);
 	max_buf_entry_size      = (maxAM + 1) * (maxAM + 2) / 2;
 	max_buf_entry_size      = max_buf_entry_size * max_buf_entry_size;
 	TinySCF->nthreads       = omp_get_max_threads();

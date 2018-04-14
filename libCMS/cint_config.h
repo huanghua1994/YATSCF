@@ -18,17 +18,14 @@
 #ifndef __CINT_CONFIG_H__
 #define __CINT_CONFIG_H__
 
-
 #include <stdio.h>
-
+#include <unistd.h>
 
 #ifndef __APPLE__
 #define HAS_MALLOC_H
 #endif
 
-#define _DEBUG_LEVEL_    1   //  0 to 10,
-                             //  0 is no debug print info at all,
-                             //  10 is full info
+#define _DEBUG_LEVEL_    1   // 0 to 10, 0 is no debug print info at all, 10 is full info
 
 #define ALIGNED_MALLOC(size)  _mm_malloc(size, __ALIGNLEN__)
 #define ALIGNED_FREE(addr)    _mm_free(addr)
@@ -64,5 +61,22 @@
 #define CINT_INFO( fmt, args... )        {}
 #endif
 
+#define CINT_ASSERT(condition) if (!(condition)) { \
+    dprintf(2, "ASSERTION FAILED: %s in %s:%d\n", #condition, __FILE__, __LINE__); \
+    fsync(2); \
+    abort(); \
+}
+
+typedef enum
+{
+    CINT_STATUS_SUCCESS          = 0,
+    CINT_STATUS_NOT_INITIALIZED  = 1,
+    CINT_STATUS_ALLOC_FAILED     = 2,
+    CINT_STATUS_INVALID_VALUE    = 3,
+    CINT_STATUS_EXECUTION_FAILED = 4,
+    CINT_STATUS_INTERNAL_ERROR   = 5,
+    CINT_STATUS_FILEIO_FAILED    = 6,
+    CINT_STATUS_OFFLOAD_ERROR    = 7
+} CIntStatus_t;
 
 #endif /* __CINT_CONFIG_H__ */
