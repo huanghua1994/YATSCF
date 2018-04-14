@@ -161,8 +161,8 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->init_time = et - st;
 	
 	// Print memory usage
-	printf("TinySCF initialization over, memory usage: %.2lf MB, ", TinySCF->mem_size / 1048576.0);
-	printf("time elapsed = %.3lf (s)\n", TinySCF->init_time);
+	printf("TinySCF initialization over, memory usage: %.2lf MB,  \t", TinySCF->mem_size / 1048576.0);
+	printf("elapsed time = %.3lf (s)\n", TinySCF->init_time);
 }
 
 
@@ -272,8 +272,8 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 	TinySCF->S_Hcore_time = et - st;
 	
 	// Print runtime
-	printf("TinySCF precompute Hcore, S, and X matrices over,   ");
-	printf("time elapsed = %.3lf (s)\n", TinySCF->S_Hcore_time);
+	printf("TinySCF precompute Hcore, S, and X matrices over,    \t");
+	printf("elapsed time = %.3lf (s)\n", TinySCF->S_Hcore_time);
 }
 
 void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
@@ -351,8 +351,8 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 	TinySCF->shell_scr_time = et - st;
 	
 	// Print runtime
-	printf("TinySCF precompute shell screening info over,       ");
-	printf("time elapsed = %.3lf (s)\n", TinySCF->shell_scr_time);
+	printf("TinySCF precompute shell screening info over,        \t");
+	printf("elapsed time = %.3lf (s)\n", TinySCF->shell_scr_time);
 }
 
 void TinySCF_get_initial_guess(TinySCF_t TinySCF)
@@ -401,6 +401,7 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 {
 	// Start SCF iterations
 	printf("TinySCF SCF iteration started...\n");
+	printf("Nuclear energy = %.10lf\n", TinySCF->nuc_energy);
 	TinySCF->iter = 0;
 	double prev_energy  = 0;
 	double energy_delta = 223;
@@ -439,9 +440,9 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		
 		et0 = get_wtime_sec();
 		
+		printf("* Iteration runtime   : %.3lf (s)\n", et0 - st0);
 		printf("* Energy = %.10lf (%.10lf)", TinySCF->HF_energy + TinySCF->nuc_energy, TinySCF->HF_energy);
-		if (TinySCF->iter > 0) printf(", delta = %e", energy_delta);
-		printf("\n* Iteration runtime = %.3lf (s)\n", et0 - st0);
+		if (TinySCF->iter > 0) printf(", delta = %e\n", energy_delta); else printf("\n");
 		
 		TinySCF->iter++;
 	}

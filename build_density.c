@@ -37,9 +37,9 @@ static void quickSort(double *eigval, int *ev_idx, int l, int r)
 void TinySCF_build_DenMat(TinySCF_t TinySCF)
 {
 	double *F_mat    = TinySCF->F_mat;
-	double *X_mat    = TinySCF->X_mat;
 	double *D_mat    = TinySCF->D_mat;
-	double *C_mat    = TinySCF->tmp_mat;
+	double *X_mat    = TinySCF->X_mat;
+	double *tmp_mat  = TinySCF->tmp_mat;
 	double *Cocc_mat = TinySCF->Cocc_mat;
 	double *eigval   = TinySCF->eigval;
 	int    *ev_idx   = TinySCF->ev_idx;
@@ -47,20 +47,21 @@ void TinySCF_build_DenMat(TinySCF_t TinySCF)
 	int    n_occ     = TinySCF->n_occ;
 	
 	// Notice: here F_mat is already = X^T * F * X
+	memcpy(tmp_mat, F_mat, DBL_SIZE * TinySCF->mat_size);
 	
 	// Diagonalize F = C0^T * epsilon * C0, and C = X * C0 
-	// [C0, E] = eig(F1), now C0 is stored in F_mat
-	LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', nbf, F_mat, nbf, eigval);  // F_mat will be overwritten by eigenvectors
-	// C = X * C0, now C is stored in C_mat
+	// [C0, E] = eig(F1), now C0 is stored in tmp_mat
+	LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', nbf, tmp_mat, nbf, eigval);  // tmp_mat will be overwritten by eigenvectors
+	// C = X * C0, now C is stored in D_mat
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
-				1.0, X_mat, nbf, F_mat, nbf, 0.0, C_mat, nbf);
+				1.0, X_mat, nbf, tmp_mat, nbf, 0.0, D_mat, nbf);
 	
 	// Form the C_occ with eigenvectors corresponding to n_occ smallest eigenvalues
 	for (int i = 0; i < nbf; i++) ev_idx[i] = i;
 	quickSort(eigval, ev_idx, 0, nbf - 1);
 	for (int j = 0; j < n_occ; j++)
 		for (int i = 0; i < nbf; i++)
-			Cocc_mat[i * n_occ + j] = C_mat[i * nbf + ev_idx[j]];
+			Cocc_mat[i * n_occ + j] = D_mat[i * nbf + ev_idx[j]];
 	
 	// D = C_occ * C_occ^T
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, nbf, nbf, n_occ, 
