@@ -1,11 +1,10 @@
 CC  = icc
-CXX = icpc
 EXE = TinySCF.exe
 
 BLAS_LIBS      = -mkl=parallel
-LIBCINT_INCDIR = /home/huangh/libcint
-LIBCINT_LIBDIR = /home/huangh/libcint
-LIBCINT_LIB    = ${LIBCINT_LIBDIR}/libcint.a 
+LIBCINT_INCDIR = ./libCMS 
+LIBCINT_LIBDIR = ./libCMS 
+LIBCINT_LIB    = ./libCMS/libcint.a  
 ERI_LIB        = /home/huangh/gtfock-simint/build-avx512/install/lib64/libsimint.a
 
 INCS    = -I./ -I${LIBCINT_INCDIR} 

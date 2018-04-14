@@ -22,4 +22,4 @@ Current status:
 
 ![](https://img.shields.io/badge/Fock%20accum.%20opt.-ready-brightgreen.svg)
 
-![](https://img.shields.io/badge/Repack%20libcint-no-red.svg)
+![](https://img.shields.io/badge/Repack%20libcint-in%20progress-yellow.svg)
