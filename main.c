@@ -4,7 +4,7 @@
 #include <omp.h>
 #include <assert.h>
 
-#include "CInt.h"
+#include "CMS.h"
 #include "TinySCF.h"
 
 static void print_usage(char *exe_name)

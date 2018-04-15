@@ -9,6 +9,7 @@
 #include "build_Fock.h"
 #include "shell_quartet_list.h"
 #include "Accum_Fock.h"
+#include "CMS.h"
 
 #define ACCUM_FOCK_PARAM 	TinySCF, tid, M, N, P_list[ipair], Q_list[ipair], \
 							thread_eris + ipair * thread_nints, \
@@ -85,7 +86,7 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 	int *uniq_sp_lid   = TinySCF->uniq_sp_lid;
 	int *uniq_sp_rid   = TinySCF->uniq_sp_rid;
 	int num_bas_func   = TinySCF->nbasfuncs;
-	SIMINT_t simint    = TinySCF->simint;
+	Simint_t simint    = TinySCF->simint;
 	double *J_mat      = TinySCF->J_mat;
 	double *K_mat      = TinySCF->K_mat;
 	double *F_mat      = TinySCF->F_mat;
@@ -105,7 +106,7 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 		create_ThreadKetShellpairLists(&thread_ksp_lists);
 		// Simint multi_shellpair buffer for batched ERI computation
         void *thread_multi_shellpair;
-        CInt_SIMINT_createThreadMultishellpair(&thread_multi_shellpair);
+        CMS_Simint_createThreadMultishellpair(&thread_multi_shellpair);
 		
 		#pragma omp for schedule(dynamic)
 		for (int MN = 0; MN < num_uniq_sp; MN++)
@@ -132,7 +133,7 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 				if (fabs(scrval1 * scrval2) <= scrtol2) continue;
 				
 				// Push ket-side shell pair to corresponding list
-				int ket_id = CInt_SIMINT_getShellpairAMIndex(simint, P, Q);
+				int ket_id = CMS_Simint_getShellpairAMIndex(simint, P, Q);
 				KetShellpairList_t target_shellpair_list = &thread_ksp_lists->ket_shellpair_lists[ket_id];
 				add_shellpair_to_KetShellPairList(target_shellpair_list, P, Q);
 				
@@ -143,7 +144,7 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 					int thread_nints;
 					
 					// Compute batched ERIs
-					CInt_computeShellQuartetBatch_SIMINT(
+					CMS_computeShellQuartetBatch_Simint(
 						simint, tid, M, N,
 						target_shellpair_list->P_list,
 						target_shellpair_list->Q_list,
@@ -164,7 +165,7 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 							thread_batch_eris, thread_nints
 						);
 						double et = get_wtime_sec();
-						if (tid == 0) CInt_SIMINT_addupdateFtimer(simint, et - st);
+						if (tid == 0) CMS_Simint_addupdateFtimer(simint, et - st);
 					}
 					
 					// Reset the computed ket-side shell pair list
@@ -183,7 +184,7 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 					int thread_nints;
 					
 					// Compute batched ERIs
-					CInt_computeShellQuartetBatch_SIMINT(
+					CMS_computeShellQuartetBatch_Simint(
 						simint, tid, M, N,
 						target_shellpair_list->P_list,
 						target_shellpair_list->Q_list,
@@ -204,7 +205,7 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 							thread_batch_eris, thread_nints
 						);
 						double et = get_wtime_sec();
-						if (tid == 0) CInt_SIMINT_addupdateFtimer(simint, et - st);
+						if (tid == 0) CMS_Simint_addupdateFtimer(simint, et - st);
 					}
 					
 					// Reset the computed ket-side shell pair list
@@ -214,7 +215,7 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 		}
 		
 		// Free batch ERI auxiliary data structures
-		CInt_SIMINT_freeThreadMultishellpair(&thread_multi_shellpair);
+		CMS_Simint_freeThreadMultishellpair(&thread_multi_shellpair);
 		free_ThreadKetShellpairLists(thread_ksp_lists);
 		
 		#pragma omp barrier

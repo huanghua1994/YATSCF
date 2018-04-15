@@ -1,6 +1,6 @@
 ## libCMS: C Middleware for Simint
 
-libCMS is a simplified version of the [libcint](https://github.com/gtfock-chem/libcint) library used by [GTFock](https://github.com/gtfock-chem/gtfock).  libCMS is responsible for:
+libCMS is a simplified version of the [libcint](https://github.com/gtfock-chem/libcint) library used by [GTFock](https://github.com/gtfock-chem/gtfock). I don't want to use the name "libcint" since it is the name of a new (after 2016) ERI library. libCMS is responsible for:
 
 1.  Parsing input molecule coordinate file, basis set file and SAD initial guess file;
 2.  Providing data structure and functions for storing and accessing the information of the input chemical system;

@@ -8,7 +8,7 @@
 
 #include <mkl.h>
 
-#include "CInt.h"
+#include "CMS.h"
 #include "utils.h"
 #include "TinySCF.h"
 #include "build_Fock.h"
@@ -32,14 +32,14 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->shell_scr_time = 0.0;
 	
 	// Load basis set and molecule from input and get chemical system info
-	CInt_createBasisSet(&(TinySCF->basis));
-	CInt_loadBasisSet(TinySCF->basis, bas_fname, xyz_fname);
-	TinySCF->natoms     = CInt_getNumAtoms   (TinySCF->basis);
-	TinySCF->nshells    = CInt_getNumShells  (TinySCF->basis);
-	TinySCF->nbasfuncs  = CInt_getNumFuncs   (TinySCF->basis);
-	TinySCF->n_occ      = CInt_getNumOccOrb  (TinySCF->basis);
-	TinySCF->charge     = CInt_getTotalCharge(TinySCF->basis);
-	TinySCF->electron   = CInt_getNneutral   (TinySCF->basis);
+	CMS_createBasisSet(&(TinySCF->basis));
+	CMS_loadBasisSet(TinySCF->basis, bas_fname, xyz_fname);
+	TinySCF->natoms     = CMS_getNumAtoms   (TinySCF->basis);
+	TinySCF->nshells    = CMS_getNumShells  (TinySCF->basis);
+	TinySCF->nbasfuncs  = CMS_getNumFuncs   (TinySCF->basis);
+	TinySCF->n_occ      = CMS_getNumOccOrb  (TinySCF->basis);
+	TinySCF->charge     = CMS_getTotalCharge(TinySCF->basis);
+	TinySCF->electron   = CMS_getNneutral   (TinySCF->basis);
 	char *basis_name    = basename(bas_fname);
 	char *molecule_name = basename(xyz_fname);
 	printf("Job information:\n");
@@ -54,7 +54,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	
 	// Initialize OpenMP parallel info and buffer
 	int maxAM, max_buf_entry_size, total_buf_size;
-	maxAM = CInt_getMaxMomentum(TinySCF->basis);
+	maxAM = CMS_getMaxMomentum(TinySCF->basis);
 	max_buf_entry_size      = (maxAM + 1) * (maxAM + 2) / 2;
 	max_buf_entry_size      = max_buf_entry_size * max_buf_entry_size;
 	TinySCF->nthreads       = omp_get_max_threads();
@@ -86,7 +86,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->mem_size += INT_SIZE * 2 * TinySCF->num_uniq_sp;
 	
 	// Initialize Simint object and shell basis function index info
-	CInt_createSIMINT(TinySCF->basis, &(TinySCF->simint), TinySCF->nthreads);
+	CMS_createSimint(TinySCF->basis, &(TinySCF->simint), TinySCF->nthreads);
 	TinySCF->shell_bf_sind = (int*) ALIGN64B_MALLOC(INT_SIZE * (TinySCF->nshells + 1));
 	TinySCF->shell_bf_num  = (int*) ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshells);
 	assert(TinySCF->shell_bf_sind != NULL);
@@ -94,8 +94,8 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->mem_size += INT_SIZE * (2 * TinySCF->nshells + 1);
 	for (int i = 0; i < TinySCF->nshells; i++)
 	{
-		TinySCF->shell_bf_sind[i] = CInt_getFuncStartInd(TinySCF->basis, i);
-		TinySCF->shell_bf_num[i]  = CInt_getShellDim    (TinySCF->basis, i);
+		TinySCF->shell_bf_sind[i] = CMS_getFuncStartInd(TinySCF->basis, i);
+		TinySCF->shell_bf_num[i]  = CMS_getShellDim    (TinySCF->basis, i);
 	}
 	TinySCF->shell_bf_sind[TinySCF->nshells] = TinySCF->nbasfuncs;
 	
@@ -202,9 +202,9 @@ void free_TinySCF(TinySCF_t TinySCF)
 	ALIGN64B_FREE(TinySCF->DIIS_rhs);
 	ALIGN64B_FREE(TinySCF->DIIS_ipiv);
 	
-	// Free BasisSet_t and SIMINT_t object, require SIMINT_t object print stat info
-	CInt_destroyBasisSet(TinySCF->basis);
-	CInt_destroySIMINT(TinySCF->simint, 1);
+	// Free BasisSet_t and Simint_t object, require Simint_t object print stat info
+	CMS_destroyBasisSet(TinySCF->basis);
+	CMS_destroySimint(TinySCF->simint, 1);
 	
 	free(TinySCF);
 }
@@ -237,11 +237,11 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 				int ncols = TinySCF->shell_bf_num[N];
 				
 				// Compute the contribution of current shell pair to core Hamiltonian matrix
-				CInt_computePairOvl_SIMINT(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
+				CMS_computePairOvl_Simint(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
 				if (nints > 0) copy_matrix_block(S_mat_ptr, TinySCF->nbasfuncs, integrals, ncols, nrows, ncols);
 				
 				// Compute the contribution of current shell pair to overlap matrix
-				CInt_computePairCoreH_SIMINT(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
+				CMS_computePairCoreH_Simint(TinySCF->basis, TinySCF->simint, tid, M, N, &integrals, &nints);
 				if (nints > 0) copy_matrix_block(Hcore_mat_ptr, TinySCF->nbasfuncs, integrals, ncols, nrows, ncols);
 			}
 		}
@@ -296,7 +296,7 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 				
 				int nints;
 				double *integrals;
-				CInt_computeShellQuartet_SIMINT(TinySCF->simint, tid, M, N, M, N, &integrals, &nints);
+				CMS_computeShellQuartet_Simint(TinySCF->simint, tid, M, N, M, N, &integrals, &nints);
 				
 				double maxval = 0.0;
 				if (nints > 0)
@@ -318,8 +318,8 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 	TinySCF->max_scrval = global_max_scrval;
 	
 	// Recreate Simint object to reset its statistic info
-	CInt_destroySIMINT(TinySCF->simint, 0);
-	CInt_createSIMINT(TinySCF->basis, &(TinySCF->simint), TinySCF->nthreads);
+	CMS_destroySimint(TinySCF->simint, 0);
+	CMS_createSimint(TinySCF->basis, &(TinySCF->simint), TinySCF->nthreads);
 	
 	// Generate unique shell pairs that survive Schwarz screening
 	// eta is the threshold for screening a shell pair
@@ -365,7 +365,7 @@ void TinySCF_get_initial_guess(TinySCF_t TinySCF)
 	// Copy the SAD data to diagonal block of the density matrix
 	for (int i = 0; i < TinySCF->natoms; i++)
 	{
-		CInt_getInitialGuess(TinySCF->basis, i, &guess, &spos, &epos);
+		CMS_getInitialGuess(TinySCF->basis, i, &guess, &spos, &epos);
 		ldg = epos - spos + 1;
 		double *D_mat_ptr = TinySCF->D_mat + spos * nbf + spos;
 		copy_matrix_block(D_mat_ptr, nbf, guess, ldg, ldg, ldg);
@@ -381,7 +381,7 @@ void TinySCF_get_initial_guess(TinySCF_t TinySCF)
 		TinySCF->D_mat[i] *= R;
 	
 	// Calculate nuclear energy
-	TinySCF->nuc_energy = CInt_getNucEnergy(TinySCF->basis);
+	TinySCF->nuc_energy = CMS_getNucEnergy(TinySCF->basis);
 }
 
 // Compute Hartree-Fock energy

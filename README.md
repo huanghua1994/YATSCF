@@ -10,11 +10,11 @@ In short, this program can be viewed as a tiny, more "formula translation" versi
 
 Current status:
 
-![](https://img.shields.io/badge/Same%20conv.%20energy%20as%20GTFock-yes-brightgreen.svg)
+![](https://img.shields.io/badge/Same%20conv.%20behaviour%20as%20GTFock-yes-brightgreen.svg)
 
 ![](https://img.shields.io/badge/SAD%20initial%20guess-ready-brightgreen.svg)
 
-![](https://img.shields.io/badge/DIIS%20acceleration-ready-brightgreen.svg)
+![](https://img.shields.io/badge/CDIIS%20acceleration-ready-brightgreen.svg)
 
 ![](https://img.shields.io/badge/OpenMP%20parallelization-ready-brightgreen.svg)
 
@@ -22,4 +22,4 @@ Current status:
 
 ![](https://img.shields.io/badge/Fock%20accum.%20opt.-ready-brightgreen.svg)
 
-![](https://img.shields.io/badge/Repack%20libcint-in%20progress-yellow.svg)
+![](https://img.shields.io/badge/libCMS-ready-brightgreen.svg)

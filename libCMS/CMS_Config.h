@@ -15,8 +15,8 @@
  * in the file COPYING.
  */
 
-#ifndef __CINT_CONFIG_H__
-#define __CINT_CONFIG_H__
+#ifndef __CMS_CONFIG_H__
+#define __CMS_CONFIG_H__
 
 #include <stdio.h>
 #include <unistd.h>
@@ -32,9 +32,9 @@
 
 
 #if ( _DEBUG_LEVEL_ == -1 )
-#define CINT_PRINTF( level, fmt, args... )        {}
+#define CMS_PRINTF( level, fmt, args... )        {}
 #else
-#define CINT_PRINTF( level, fmt, args... )                                          \
+#define CMS_PRINTF( level, fmt, args... )                                          \
         do                                                                          \
         {                                                                           \
             if ( (unsigned)(level) <= _DEBUG_LEVEL_ )                               \
@@ -49,19 +49,19 @@
 
 
 #if ( _DEBUG_LEVEL_ > 1 )
-#define CINT_INFO( fmt, args... )                                            \
+#define CMS_INFO( fmt, args... )                                            \
         do                                                                   \
         {                                                                    \
-            sprintf( basis->str_buf, "**** CInt: ");                         \
-            sprintf( basis->str_buf + strlen("**** CInt: "), fmt, ##args );  \
+            sprintf( basis->str_buf, "**** CMS: ");                         \
+            sprintf( basis->str_buf + strlen("**** CMS: "), fmt, ##args );  \
             fprintf( stdout, "%s", basis->str_buf );                         \
             fflush( stdout );                                                \
         } while ( 0 )
 #else
-#define CINT_INFO( fmt, args... )        {}
+#define CMS_INFO( fmt, args... )        {}
 #endif
 
-#define CINT_ASSERT(condition) if (!(condition)) { \
+#define CMS_ASSERT(condition) if (!(condition)) { \
     dprintf(2, "ASSERTION FAILED: %s in %s:%d\n", #condition, __FILE__, __LINE__); \
     fsync(2); \
     abort(); \
@@ -69,14 +69,14 @@
 
 typedef enum
 {
-    CINT_STATUS_SUCCESS          = 0,
-    CINT_STATUS_NOT_INITIALIZED  = 1,
-    CINT_STATUS_ALLOC_FAILED     = 2,
-    CINT_STATUS_INVALID_VALUE    = 3,
-    CINT_STATUS_EXECUTION_FAILED = 4,
-    CINT_STATUS_INTERNAL_ERROR   = 5,
-    CINT_STATUS_FILEIO_FAILED    = 6,
-    CINT_STATUS_OFFLOAD_ERROR    = 7
-} CIntStatus_t;
+    CMS_STATUS_SUCCESS          = 0,
+    CMS_STATUS_NOT_INITIALIZED  = 1,
+    CMS_STATUS_ALLOC_FAILED     = 2,
+    CMS_STATUS_INVALID_VALUE    = 3,
+    CMS_STATUS_EXECUTION_FAILED = 4,
+    CMS_STATUS_INTERNAL_ERROR   = 5,
+    CMS_STATUS_FILEIO_FAILED    = 6,
+    CMS_STATUS_OFFLOAD_ERROR    = 7
+} CMSStatus_t;
 
-#endif /* __CINT_CONFIG_H__ */
+#endif

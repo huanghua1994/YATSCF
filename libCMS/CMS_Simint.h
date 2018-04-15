@@ -15,10 +15,10 @@
  * in the file COPYING.
  */
 
-#ifndef __CINT_SIMINT_H__
-#define __CINT_SIMINT_H__
+#ifndef __CMS_SIMINT_H__
+#define __CMS_SIMINT_H__
 
-struct SIMINT
+struct Simint
 {
     int nthreads;
     int max_am;
@@ -39,55 +39,56 @@ struct SIMINT
 
     // For statistic
     double *num_multi_shellpairs, *sum_nprim;
-    double *num_screened_prim, *num_unscreened_prim, *num_screened_vec, *num_unscreened_vec;
+    double *num_screened_prim, *num_unscreened_prim;
+	double *num_screened_vec,  *num_unscreened_vec;
 };
 
-typedef struct SIMINT *SIMINT_t;
+typedef struct Simint *Simint_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-CIntStatus_t CInt_createSIMINT(BasisSet_t basis, SIMINT_t *simint, int nthreads);
+CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads);
 
-CIntStatus_t CInt_destroySIMINT(SIMINT_t simint, int show_stat);
+CMSStatus_t CMS_destroySimint(Simint_t simint, int show_stat);
 
-CIntStatus_t
-CInt_computeShellQuartet_SIMINT(SIMINT_t simint, int tid,
+CMSStatus_t
+CMS_computeShellQuartet_Simint(Simint_t simint, int tid,
                                 int A, int B, int C, int D,
                                 double **integrals, int *nints);
 
-CIntStatus_t
-CInt_computePairOvl_SIMINT(BasisSet_t basis, SIMINT_t simint, int tid,
+CMSStatus_t
+CMS_computePairOvl_Simint(BasisSet_t basis, Simint_t simint, int tid,
                            int A, int B,
                            double **integrals, int *nints);
 
-CIntStatus_t
-CInt_computePairCoreH_SIMINT(BasisSet_t basis, SIMINT_t simint, int tid,
+CMSStatus_t
+CMS_computePairCoreH_Simint(BasisSet_t basis, Simint_t simint, int tid,
                            int A, int B,
                            double **integrals, int *nints);
 
 
-// The following 2 constants are corresponding to SIMINT_OSTEI_MAXAM
-// and SIMINT_NSHELL_SIMD in Simint. I cannot include <simint/simint.h>
+// The following 2 constants are corresponding to Simint_OSTEI_MAXAM
+// and Simint_NSHELL_SIMD in Simint. I cannot include <simint/simint.h>
 // here, so I just update the values manually. This problem should be 
 // solved later.
-#define _SIMINT_OSTEI_MAXAM 4
-#define _SIMINT_NSHELL_SIMD 16
+#define _Simint_OSTEI_MAXAM 4
+#define _Simint_NSHELL_SIMD 16
 
-#define _SIMINT_AM_PAIRS (((_SIMINT_OSTEI_MAXAM) + 1) * ((_SIMINT_OSTEI_MAXAM) + 1))
+#define _Simint_AM_PAIRS (((_Simint_OSTEI_MAXAM) + 1) * ((_Simint_OSTEI_MAXAM) + 1))
 
-void CInt_SIMINT_addupdateFtimer(SIMINT_t simint, double sec);
+void CMS_Simint_addupdateFtimer(Simint_t simint, double sec);
 
-int  CInt_SIMINT_getShellpairAMIndex(SIMINT_t simint, int P, int Q);
+int  CMS_Simint_getShellpairAMIndex(Simint_t simint, int P, int Q);
 
-void CInt_SIMINT_createThreadMultishellpair(void **thread_multi_shellpair);
+void CMS_Simint_createThreadMultishellpair(void **thread_multi_shellpair);
 
-void CInt_SIMINT_freeThreadMultishellpair(void **thread_multi_shellpair);
+void CMS_Simint_freeThreadMultishellpair(void **thread_multi_shellpair);
 
-CIntStatus_t 
-CInt_computeShellQuartetBatch_SIMINT(
-    SIMINT_t simint, int tid,
+CMSStatus_t 
+CMS_computeShellQuartetBatch_Simint(
+    Simint_t simint, int tid,
     int M, int N, int *P_list, int *Q_list,
     int npair, double **thread_batch_integrals, int *thread_batch_nints,
     void **thread_multi_shellpairs

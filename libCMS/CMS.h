@@ -15,17 +15,17 @@
  * in the file COPYING.
  */
 
-#ifndef __CINT_H__
-#define __CINT_H__
+#ifndef __CMS_H__
+#define __CMS_H__
 
 #include <stdint.h>
 #include <sys/time.h>
 
-#include "cint_config.h"
-#include "cint_basisset.h"
-#include "cint_simint.h"
+#include "CMS_Config.h"
+#include "CMS_BasisSet.h"
+#include "CMS_Simint.h"
 
-static inline double CInt_get_walltime_sec()
+static inline double CMS_get_walltime_sec()
 {
     double sec;
     struct timeval tv;
@@ -34,4 +34,4 @@ static inline double CInt_get_walltime_sec()
     return sec;
 }
 
-#endif /* __CINT_H__ */
+#endif

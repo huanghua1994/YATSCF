@@ -15,10 +15,10 @@
  * in the file COPYING.
  */
 
-#ifndef __CINT_BASISSET_H__
-#define __CINT_BASISSET_H__
+#ifndef __CMS_BASISSET_H__
+#define __CMS_BASISSET_H__
 
-#include "cint_config.h"
+#include "CMS_Config.h"
 
 struct BasisSet
 {
@@ -77,54 +77,54 @@ typedef struct BasisSet *BasisSet_t;
 extern "C" {
 #endif
 
-CIntStatus_t CInt_createBasisSet(BasisSet_t *basis);
+CMSStatus_t CMS_createBasisSet(BasisSet_t *basis);
 
-CIntStatus_t CInt_destroyBasisSet(BasisSet_t basis);
+CMSStatus_t CMS_destroyBasisSet(BasisSet_t basis);
 
-CIntStatus_t CInt_loadBasisSet(BasisSet_t basis, char *bsfile, char *xyzfile );
+CMSStatus_t CMS_loadBasisSet(BasisSet_t basis, char *bsfile, char *xyzfile );
 
-int CInt_getNumAtoms(BasisSet_t basis);
+int CMS_getNumAtoms(BasisSet_t basis);
 
-int CInt_getNumShells(BasisSet_t basis);
+int CMS_getNumShells(BasisSet_t basis);
 
-int CInt_getNumFuncs(BasisSet_t basis);
+int CMS_getNumFuncs(BasisSet_t basis);
 
-int CInt_getNumOccOrb(BasisSet_t basis);
+int CMS_getNumOccOrb(BasisSet_t basis);
 
-int CInt_getFuncStartInd(BasisSet_t basis, int shellid);
+int CMS_getFuncStartInd(BasisSet_t basis, int shellid);
 
-int CInt_getFuncEndInd(BasisSet_t basis, int shellid);
+int CMS_getFuncEndInd(BasisSet_t basis, int shellid);
 
-int CInt_getShellDim(BasisSet_t basis, int shellid);
+int CMS_getShellDim(BasisSet_t basis, int shellid);
 
-int CInt_getMaxShellDim(BasisSet_t basis);
+int CMS_getMaxShellDim(BasisSet_t basis);
 
-int CInt_getAtomStartInd(BasisSet_t basis, int atomid);
+int CMS_getAtomStartInd(BasisSet_t basis, int atomid);
 
-int CInt_getAtomEndInd(BasisSet_t basis, int atomid);
+int CMS_getAtomEndInd(BasisSet_t basis, int atomid);
 
-int CInt_getTotalCharge(BasisSet_t basis);
+int CMS_getTotalCharge(BasisSet_t basis);
 
-int CInt_getNneutral(BasisSet_t basis);
+int CMS_getNneutral(BasisSet_t basis);
 
-int CInt_getMaxMomentum(BasisSet_t basis);
+int CMS_getMaxMomentum(BasisSet_t basis);
 
-int CInt_getMaxPrimid(BasisSet_t basis);
+int CMS_getMaxPrimid(BasisSet_t basis);
 
-int CInt_getMaxnumExp(BasisSet_t basis);
+int CMS_getMaxnumExp(BasisSet_t basis);
 
-double CInt_getNucEnergy(BasisSet_t basis);
+double CMS_getNucEnergy(BasisSet_t basis);
 
-void CInt_getInitialGuess(BasisSet_t basis, int atomid, double **guess, int *spos, int *epos);
+void CMS_getInitialGuess(BasisSet_t basis, int atomid, double **guess, int *spos, int *epos);
 
-void CInt_getShellxyz(BasisSet_t basis, int shellid, double *x, double *y, double *z);
+void CMS_getShellxyz(BasisSet_t basis, int shellid, double *x, double *y, double *z);
 
-// The following 4 functions are called by CInt_loadBasisSet, be careful and make sure you 
+// The following 4 functions are called by CMS_loadBasisSet, be careful and make sure you 
 // understand what you are doing if you want to call any of them from external program
-CIntStatus_t CInt_import_molecule(char *file, BasisSet_t basis);
-CIntStatus_t CInt_import_basis(char *file, BasisSet_t basis);
-CIntStatus_t CInt_parse_molecule(BasisSet_t basis);
-CIntStatus_t CInt_import_guess(char *file, BasisSet_t basis);
+CMSStatus_t CMS_import_molecule(char *file, BasisSet_t basis);
+CMSStatus_t CMS_import_basis(char *file, BasisSet_t basis);
+CMSStatus_t CMS_parse_molecule(BasisSet_t basis);
+CMSStatus_t CMS_import_guess(char *file, BasisSet_t basis);
 
 #ifdef __cplusplus
 }

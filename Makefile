@@ -2,20 +2,20 @@ CC  = icc
 EXE = TinySCF.exe
 
 BLAS_LIBS      = -mkl=parallel
-LIBCINT_INCDIR = ./libCMS 
-LIBCINT_LIBDIR = ./libCMS 
-LIBCINT_LIB    = ./libCMS/libcint.a  
-ERI_LIB        = /home/huangh/gtfock-simint/build-avx512/install/lib64/libsimint.a
+LIBCMS_DIR     = ./libCMS 
+LIBCMS_INCDIR  = ./libCMS 
+LIBCMS_LIBFILE = ./libCMS/libCMS.a
+LIBSIMINT      = /home/huangh/gtfock-simint/build-avx512/install/lib64/libsimint.a
 
-INCS    = -I./ -I${LIBCINT_INCDIR} 
-LIBS    = ${BLAS_LIBS} ${LIBCINT_LIB} ${ERI_LIB}
+INCS    = -I./ -I${LIBCMS_INCDIR} 
+LIBS    = ${BLAS_LIBS} ${LIBCMS_LIBFILE} ${LIBSIMINT}
 
 CFLAGS  = -Wall -g -O3 -qopenmp -std=gnu99 -xHost
-LDFLAGS = -L${LIBCINT_LIB} -lpthread -qopenmp
+LDFLAGS = -L${LIBCMS_LIBFILE} -lpthread -qopenmp
 
 OBJS = utils.o build_density.o shell_quartet_list.o Accum_Fock.o build_Fock.o DIIS.o TinySCF.o main.o 
 
-$(EXE): Makefile $(OBJS) ${LIBCINT_LIB} ${ERI_LIB}
+$(EXE): Makefile $(OBJS) ${LIBCMS_LIBFILE} ${LIBSIMINT}
 	$(CC) ${CFLAGS} ${LDFLAGS} $(OBJS) -o $(EXE) ${LIBS}
 
 utils.o: Makefile utils.c utils.h

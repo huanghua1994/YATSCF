@@ -2,7 +2,7 @@
 #define _YATSCF_TFOCK_H_
 
 #include <omp.h>
-#include "CInt.h"
+#include "CMS.h"
 
 #define MAX_DIIS 10
 #define MIN_DIIS 2
@@ -16,7 +16,7 @@ struct TinySCF_struct
 	double *Accum_Fock_buf; // Pointer to all thread's buffer for accumulating Fock matrix
 	
 	// Chemical system info
-	BasisSet_t basis;     // Basis set object for storing chemical system info, handled by libcint
+	BasisSet_t basis;     // Basis set object for storing chemical system info, handled by libCMS
 	int natoms, nshells;  // Number of atoms and shells
 	int nbasfuncs, n_occ; // Number of basis functions and occupied orbits
 	int charge, electron; // Charge and number of electrons 
@@ -40,7 +40,7 @@ struct TinySCF_struct
 	int    *uniq_sp_rid;  // Right shell id of all unique shell pairs
 	
 	// ERIs
-	SIMINT_t simint;      // Simint object for ERI, handled by libcint
+	Simint_t simint;      // Simint object for ERI, handled by libCMS
 	int *shell_bf_sind;   // Index of the first basis function of each shell
 	int *shell_bf_num;    // Number of basis function in each shell
 	
