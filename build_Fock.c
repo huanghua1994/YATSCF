@@ -105,8 +105,8 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 		ThreadKetShellpairLists_t thread_ksp_lists;
 		create_ThreadKetShellpairLists(&thread_ksp_lists);
 		// Simint multi_shellpair buffer for batched ERI computation
-        void *thread_multi_shellpair;
-        CMS_Simint_createThreadMultishellpair(&thread_multi_shellpair);
+		void *thread_multi_shellpair;
+		CMS_Simint_createThreadMultishellpair(&thread_multi_shellpair);
 		
 		#pragma omp for schedule(dynamic)
 		for (int MN = 0; MN < num_uniq_sp; MN++)

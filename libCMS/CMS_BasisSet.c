@@ -240,6 +240,8 @@ CMSStatus_t CMS_parse_molecule(BasisSet_t basis)
     CMS_ASSERT(basis->norm       != NULL);
     CMS_ASSERT(basis->momentum   != NULL);
     basis->nshells = nshells; // number of shells for this molecule
+    basis->mem_size += sizeof(uint32_t) * (natoms + 1 + nshells * 4)
+                     + sizeof(double) * nshells * 9 + sizeof(double *) * nshells * 3;
 
     // loop over atoms in the molecule
     nshells = 0;
@@ -357,6 +359,7 @@ CMSStatus_t CMS_import_molecule(char *file, BasisSet_t basis)
         CMS_PRINTF (1, "memory allocation failed\n");
         return CMS_STATUS_ALLOC_FAILED;
     }
+    basis->mem_size += sizeof(double) * basis->natoms * 4 + sizeof(int) * basis->natoms;
 
     // read x, y and z
     natoms = 0;
@@ -525,6 +528,8 @@ CMSStatus_t CMS_import_basis(char *file, BasisSet_t basis)
     CMS_ASSERT(basis->bs_exp        != NULL);
     CMS_ASSERT(basis->bs_momentum   != NULL);
     CMS_ASSERT(basis->bs_eid        != NULL);
+	basis->mem_size += sizeof(int) * (basis->bs_nelements + natoms * 2 + 1 + nshells * 2)
+	                 + sizeof(double*) * nshells * 3;
     for (i = 0; i < basis->bs_nelements; i++) {
         basis->bs_eptr[i] = -1;
     }
@@ -579,6 +584,7 @@ CMSStatus_t CMS_import_basis(char *file, BasisSet_t basis)
                         assert(basis->bs_cc[nshells]   != NULL);
                         assert(basis->bs_exp[nshells]  != NULL);
                         assert(basis->bs_norm[nshells] != NULL);
+                        basis->mem_size += sizeof(double) * nexp * 3;
                         for (j = 0; j < SLEN; j++) // match angular momentum symbol to index
                         {
                             if (str[i] == mtable[j])
@@ -690,6 +696,8 @@ CMSStatus_t CMS_import_guess(char *file, BasisSet_t basis)
         // allocate space for guess for element i (not a global-sized matrix)
         basis->guess[i] =
             (double *)malloc(sizeof(double) * nfunctions * nfunctions);
+        CMS_ASSERT(basis->guess[i] != NULL);
+        basis->mem_size += sizeof(double) * nfunctions * nfunctions;
 
         // read guess
         eid = (eid >= ELEN ? 0 : eid);
@@ -737,7 +745,7 @@ end:
     return CMS_STATUS_SUCCESS;
 }
 
-CMSStatus_t CMS_loadBasisSet(BasisSet_t basis, char *bsfile, char *molfile)
+CMSStatus_t CMS_loadChemicalSystem(BasisSet_t basis, char *bsfile, char *molfile)
 {
     CMSStatus_t status;
 
@@ -756,7 +764,9 @@ CMSStatus_t CMS_loadBasisSet(BasisSet_t basis, char *bsfile, char *molfile)
     // import guess
 	status = CMS_import_guess(bsfile, basis);
 	if (status != CMS_STATUS_SUCCESS) return status;
-    
+
+    printf("CMS basis set memory usage = %.2lf MB\n", basis->mem_size / 1048576.0);
+	
     return CMS_STATUS_SUCCESS;
 }
 

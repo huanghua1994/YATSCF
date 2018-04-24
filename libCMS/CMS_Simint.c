@@ -66,6 +66,7 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
     s->nshells = basis->nshells;
     s->shells = (struct simint_shell *) malloc(sizeof(struct simint_shell)*basis->nshells);
     CMS_ASSERT(s->shells != NULL);
+    s->shell_memsize = sizeof(struct simint_shell)*basis->nshells;
 
     struct simint_shell *shell_p = s->shells;
     for (int i=0; i<basis->nshells; i++)
@@ -75,6 +76,7 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
 
         // Allocate space for alpha and coef for the shell
         simint_allocate_shell(basis->nexp[i], shell_p);
+        s->shell_memsize += shell_p->memsize;
 
         shell_p->am    = basis->momentum[i];
         shell_p->nprim = basis->nexp[i];
@@ -104,6 +106,8 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
     s->shellpairs = (struct simint_multi_shellpair *)
         malloc(sizeof(struct simint_multi_shellpair)*basis->nshells*basis->nshells);
     CMS_ASSERT(s->shellpairs != NULL);
+    s->shellpair_memsize = sizeof(struct simint_multi_shellpair)*basis->nshells*basis->nshells;
+
     // UNDONE: exploit symmetry
     for (int i=0; i<basis->nshells; i++)
     {
@@ -113,6 +117,7 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
             pair = &s->shellpairs[i*basis->nshells+j];
             simint_initialize_multi_shellpair(pair);
             simint_create_multi_shellpair(1, s->shells+i, 1, s->shells+j, pair, s->screen_method);
+            s->shellpair_memsize += pair->memsize;
         }
     }
     
@@ -138,6 +143,21 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
     memset(s->num_unscreened_prim,  0, stat_info_size);
     memset(s->num_screened_vec,     0, stat_info_size);
     memset(s->num_unscreened_vec,   0, stat_info_size);
+    
+    double workmem_MB = s->workmem_per_thread * 64 * sizeof(double) / 1048576.0;
+    double outmem_MB  = s->outmem_per_thread  * 64 * sizeof(double) / 1048576.0;
+    double shell_mem_MB     = s->shell_memsize     / 1048576.0;
+    double shellpair_mem_MB = s->shellpair_memsize / 1048576.0;
+    double stat_info_mem_MB = stat_info_size * 6   / 1048576.0;
+    double Simint_mem_MB = workmem_MB + outmem_MB + outmem_MB + shellpair_mem_MB + stat_info_mem_MB;
+    printf("CMS Simint memory usage = %.2lf MB \n", Simint_mem_MB);
+    /*
+    printf("- Simint workspace       : %.2lf MB\n", workmem_MB);
+    printf("- Simint output buffer   : %.2lf MB\n", outmem_MB);
+    printf("- Simint shell data      : %.2lf MB\n", shell_mem_MB);
+    printf("- Simint shell pair data : %.2lf MB\n", shellpair_mem_MB);
+    printf("- Simint statistic info  : %.2lf MB\n", stat_info_mem_MB);
+	*/
     
     *simint = s;
     return CMS_STATUS_SUCCESS;
@@ -454,4 +474,15 @@ CMS_computePairCoreH_Simint(BasisSet_t basis, Simint_t simint, int tid,
     free(temp);
 
     return CMS_STATUS_SUCCESS;
+}
+
+void CMS_Simint_resetStatisInfo(Simint_t simint)
+{
+	int stat_info_size = sizeof(double) * simint->nthreads;
+    memset(simint->num_multi_shellpairs, 0, stat_info_size);
+    memset(simint->sum_nprim,            0, stat_info_size);
+    memset(simint->num_screened_prim,    0, stat_info_size);
+    memset(simint->num_unscreened_prim,  0, stat_info_size);
+    memset(simint->num_screened_vec,     0, stat_info_size);
+    memset(simint->num_unscreened_vec,   0, stat_info_size);
 }

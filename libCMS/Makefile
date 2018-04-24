@@ -10,7 +10,7 @@ INC=-I. -I${SIMINT_DIR}/include
 OPTFLAGS = -m64 
 
 SRC     = CMS_BasisSet.c CMS_Simint.c
-CFLAGS  = -O3 -Wall -qopenmp -g -std=gnu99 -qno-offload
+CFLAGS  = -O3 -Wall -qopenmp -g -std=gnu99
 CFLAGS += ${OPTFLAGS}
 CFLAGS += -D__ALIGNLEN__=${alignlen}
 

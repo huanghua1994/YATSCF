@@ -33,7 +33,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	
 	// Load basis set and molecule from input and get chemical system info
 	CMS_createBasisSet(&(TinySCF->basis));
-	CMS_loadBasisSet(TinySCF->basis, bas_fname, xyz_fname);
+	CMS_loadChemicalSystem(TinySCF->basis, bas_fname, xyz_fname);
 	TinySCF->natoms     = CMS_getNumAtoms   (TinySCF->basis);
 	TinySCF->nshells    = CMS_getNumShells  (TinySCF->basis);
 	TinySCF->nbasfuncs  = CMS_getNumFuncs   (TinySCF->basis);
@@ -318,8 +318,7 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 	TinySCF->max_scrval = global_max_scrval;
 	
 	// Recreate Simint object to reset its statistic info
-	CMS_destroySimint(TinySCF->simint, 0);
-	CMS_createSimint(TinySCF->basis, &(TinySCF->simint), TinySCF->nthreads);
+	CMS_Simint_resetStatisInfo(TinySCF->simint);
 	
 	// Generate unique shell pairs that survive Schwarz screening
 	// eta is the threshold for screening a shell pair

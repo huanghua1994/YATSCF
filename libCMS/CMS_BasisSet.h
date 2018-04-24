@@ -67,6 +67,8 @@ struct BasisSet
     uint32_t max_momentum;
     uint32_t max_nexp;
     uint32_t max_nexp_id;
+	
+    int mem_size;
     
     char str_buf[512];
 };
@@ -81,7 +83,7 @@ CMSStatus_t CMS_createBasisSet(BasisSet_t *basis);
 
 CMSStatus_t CMS_destroyBasisSet(BasisSet_t basis);
 
-CMSStatus_t CMS_loadBasisSet(BasisSet_t basis, char *bsfile, char *xyzfile );
+CMSStatus_t CMS_loadChemicalSystem(BasisSet_t basis, char *bsfile, char *xyzfile );
 
 int CMS_getNumAtoms(BasisSet_t basis);
 

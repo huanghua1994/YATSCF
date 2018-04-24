@@ -24,6 +24,8 @@ struct Simint
     int max_am;
     int workmem_per_thread;
     int outmem_per_thread;
+    int shell_memsize;
+    int shellpair_memsize;
     double *workbuf;
     double *outbuf;
 
@@ -93,6 +95,8 @@ CMS_computeShellQuartetBatch_Simint(
     int npair, double **thread_batch_integrals, int *thread_batch_nints,
     void **thread_multi_shellpairs
 );
+
+void CMS_Simint_resetStatisInfo(Simint_t simint);
 
 #ifdef __cplusplus
 }
