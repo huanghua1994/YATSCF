@@ -62,7 +62,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	total_buf_size          = TinySCF->max_buf_size * TinySCF->nthreads;
 	TinySCF->Accum_Fock_buf = ALIGN64B_MALLOC(DBL_SIZE * total_buf_size);
 	assert(TinySCF->Accum_Fock_buf);
-	TinySCF->mem_size += TinySCF->max_buf_size;
+	TinySCF->mem_size += (double) TinySCF->max_buf_size;
 	
 	// Compute auxiliary variables
 	TinySCF->nshellpairs = TinySCF->nshells   * TinySCF->nshells;
@@ -82,8 +82,8 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	assert(TinySCF->sp_scrval     != NULL);
 	assert(TinySCF->uniq_sp_lid   != NULL);
 	assert(TinySCF->uniq_sp_rid   != NULL);
-	TinySCF->mem_size += DBL_SIZE * TinySCF->nshellpairs;
-	TinySCF->mem_size += INT_SIZE * 2 * TinySCF->num_uniq_sp;
+	TinySCF->mem_size += (double) (DBL_SIZE * TinySCF->nshellpairs);
+	TinySCF->mem_size += (double) (INT_SIZE * 2 * TinySCF->num_uniq_sp);
 	
 	// Initialize Simint object and shell basis function index info
 	CMS_createSimint(TinySCF->basis, &(TinySCF->simint), TinySCF->nthreads);
@@ -91,7 +91,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->shell_bf_num  = (int*) ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshells);
 	assert(TinySCF->shell_bf_sind != NULL);
 	assert(TinySCF->shell_bf_num  != NULL);
-	TinySCF->mem_size += INT_SIZE * (2 * TinySCF->nshells + 1);
+	TinySCF->mem_size += (double) (INT_SIZE * (2 * TinySCF->nshells + 1));
 	for (int i = 0; i < TinySCF->nshells; i++)
 	{
 		TinySCF->shell_bf_sind[i] = CMS_getFuncStartInd(TinySCF->basis, i);
@@ -123,9 +123,9 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	assert(TinySCF->Cocc_mat  != NULL);
 	assert(TinySCF->eigval    != NULL);
 	assert(TinySCF->eigval    != NULL);
-	TinySCF->mem_size += 8 * mat_mem_size;
-	TinySCF->mem_size += DBL_SIZE * TinySCF->n_occ * TinySCF->nbasfuncs;
-	TinySCF->mem_size += (DBL_SIZE + INT_SIZE) * TinySCF->nbasfuncs;
+	TinySCF->mem_size += (double) (8 * mat_mem_size);
+	TinySCF->mem_size += (double) (DBL_SIZE * TinySCF->n_occ * TinySCF->nbasfuncs);
+	TinySCF->mem_size += (double) ((DBL_SIZE + INT_SIZE) * TinySCF->nbasfuncs);
 
 	// Allocate memory for matrices and temporary arrays used in DIIS
 	int DIIS_row_memsize = DBL_SIZE * (MAX_DIIS + 1);
@@ -140,10 +140,10 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	assert(TinySCF->B_mat     != NULL);
 	assert(TinySCF->DIIS_rhs  != NULL);
 	assert(TinySCF->DIIS_ipiv != NULL);
-	TinySCF->mem_size += MAX_DIIS * 2 * mat_mem_size;
-	TinySCF->mem_size += DIIS_row_memsize * (MAX_DIIS + 2);
-	TinySCF->mem_size += INT_SIZE * (MAX_DIIS + 1);
-	TinySCF->mem_size += mat_mem_size;
+	TinySCF->mem_size += MAX_DIIS * 2 * (double) mat_mem_size;
+	TinySCF->mem_size += (double) DIIS_row_memsize * (MAX_DIIS + 2);
+	TinySCF->mem_size += (double) INT_SIZE * (MAX_DIIS + 1);
+	TinySCF->mem_size += (double) mat_mem_size;
 	// Must initialize F0 and R as 0 
 	memset(TinySCF->F0_mat, 0, mat_mem_size * MAX_DIIS);
 	memset(TinySCF->R_mat,  0, mat_mem_size * MAX_DIIS);

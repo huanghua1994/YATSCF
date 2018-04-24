@@ -66,7 +66,7 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
     s->nshells = basis->nshells;
     s->shells = (struct simint_shell *) malloc(sizeof(struct simint_shell)*basis->nshells);
     CMS_ASSERT(s->shells != NULL);
-    s->shell_memsize = sizeof(struct simint_shell)*basis->nshells;
+    s->shell_memsize = (double) sizeof(struct simint_shell)*basis->nshells;
 
     struct simint_shell *shell_p = s->shells;
     for (int i=0; i<basis->nshells; i++)
@@ -76,7 +76,7 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
 
         // Allocate space for alpha and coef for the shell
         simint_allocate_shell(basis->nexp[i], shell_p);
-        s->shell_memsize += shell_p->memsize;
+        s->shell_memsize += (double) shell_p->memsize;
 
         shell_p->am    = basis->momentum[i];
         shell_p->nprim = basis->nexp[i];
@@ -106,7 +106,7 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
     s->shellpairs = (struct simint_multi_shellpair *)
         malloc(sizeof(struct simint_multi_shellpair)*basis->nshells*basis->nshells);
     CMS_ASSERT(s->shellpairs != NULL);
-    s->shellpair_memsize = sizeof(struct simint_multi_shellpair)*basis->nshells*basis->nshells;
+    s->shellpair_memsize = (double) sizeof(struct simint_multi_shellpair)*basis->nshells*basis->nshells;
 
     // UNDONE: exploit symmetry
     for (int i=0; i<basis->nshells; i++)
@@ -117,7 +117,7 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
             pair = &s->shellpairs[i*basis->nshells+j];
             simint_initialize_multi_shellpair(pair);
             simint_create_multi_shellpair(1, s->shells+i, 1, s->shells+j, pair, s->screen_method);
-            s->shellpair_memsize += pair->memsize;
+            s->shellpair_memsize += (double) pair->memsize;
         }
     }
     

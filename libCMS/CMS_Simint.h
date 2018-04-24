@@ -24,8 +24,8 @@ struct Simint
     int max_am;
     int workmem_per_thread;
     int outmem_per_thread;
-    int shell_memsize;
-    int shellpair_memsize;
+    double shell_memsize;
+    double shellpair_memsize;
     double *workbuf;
     double *outbuf;
 
