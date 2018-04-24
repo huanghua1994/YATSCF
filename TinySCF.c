@@ -371,11 +371,12 @@ void TinySCF_get_initial_guess(TinySCF_t TinySCF)
 	}
 	
 	// Scaling the initial density matrix according to the charge and neutral
-	double R = 0.5;
+	double R = 1.0;
 	int charge   = TinySCF->charge;
 	int electron = TinySCF->electron; 
 	if (charge != 0 && electron != 0) 
 		R = (double)(electron - charge) / (double)(electron);
+	R *= 0.5;
 	for (int i = 0; i < TinySCF->mat_size; i++)
 		TinySCF->D_mat[i] *= R;
 	

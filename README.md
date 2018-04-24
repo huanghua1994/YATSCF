@@ -24,4 +24,3 @@ Current status:
 
 ![](https://img.shields.io/badge/libCMS-ready-brightgreen.svg)
 
-![](https://img.shields.io/badge/negative%20charge-not%20ready-red.svg)
