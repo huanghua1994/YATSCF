@@ -31,8 +31,7 @@
 // All nodes have a copy of the BasisSet_t structure here and will form and 
 // store the Simint shells for all shells of the molecule.
 
-// for Simint, caller provides memory where integrals will be stored;
-// for ERD, library returns pointer to where integrals are stored;
+// for Simint, caller provides memory where integrals will be stored
 
 CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
 {
@@ -62,7 +61,7 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
     s->outbuf = (double *) _mm_malloc(s->outmem_per_thread * nthreads * sizeof(double), 64);
     CMS_ASSERT(s->outbuf != NULL);
 
-    // Form and store simint shells for all shells of this molecule
+    // Form and store Simint shells for all shells of this molecule
     s->nshells = basis->nshells;
     s->shells = (struct simint_shell *) malloc(sizeof(struct simint_shell)*basis->nshells);
     CMS_ASSERT(s->shells != NULL);
@@ -98,8 +97,8 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
 
     s->screen_method = SIMINT_SCREEN_FASTSCHWARZ;
     s->screen_tol    = 1.e-14;
-    printf("Simint screen method   : SIMINT_SCREEN_FASTSCHWARZ \n");
-    printf("Simint prim screen tol :  %e\n", s->screen_tol);
+    printf("Simint screen method    = SIMINT_SCREEN_FASTSCHWARZ \n");
+    printf("Simint prim screen tol  = %e\n", s->screen_tol);
 
     // Precompute all shell pairs
     // Will be used by CMS_Simint_fillMultishellpairByShellList(), DO NOT SKIP it!!!
@@ -151,13 +150,6 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
     double stat_info_mem_MB = stat_info_size * 6   / 1048576.0;
     double Simint_mem_MB = workmem_MB + outmem_MB + outmem_MB + shellpair_mem_MB + stat_info_mem_MB;
     printf("CMS Simint memory usage = %.2lf MB \n", Simint_mem_MB);
-    /*
-    printf("- Simint workspace       : %.2lf MB\n", workmem_MB);
-    printf("- Simint output buffer   : %.2lf MB\n", outmem_MB);
-    printf("- Simint shell data      : %.2lf MB\n", shell_mem_MB);
-    printf("- Simint shell pair data : %.2lf MB\n", shellpair_mem_MB);
-    printf("- Simint statistic info  : %.2lf MB\n", stat_info_mem_MB);
-	*/
     
     *simint = s;
     return CMS_STATUS_SUCCESS;
@@ -186,7 +178,7 @@ CMSStatus_t CMS_destroySimint(Simint_t simint, int show_stat)
     if (show_stat)
     {
         printf(
-            "Timer: OSTEI setup, OSTEI actual, fock_task update_F = %lf, %lf, %lf sec\n", 
+            "Timer: Simint setup, Simint ERI actual, Fock mat accum. = %lf, %lf, %lf sec\n", 
             simint->ostei_setup, simint->ostei_actual, simint->fock_update_F
         );
         printf(
@@ -416,7 +408,7 @@ CMS_computeShellQuartet_Simint(Simint_t simint, int tid,
     return CMS_STATUS_SUCCESS;
 }
 
-// Interface has tid argument, different from OED version.
+// Compute integrals for the overlap matrix 
 CMSStatus_t
 CMS_computePairOvl_Simint(BasisSet_t basis, Simint_t simint, int tid,
                            int A, int B,
@@ -437,7 +429,7 @@ CMS_computePairOvl_Simint(BasisSet_t basis, Simint_t simint, int tid,
     return CMS_STATUS_SUCCESS;
 }
 
-// Interface has tid argument, different from OED version.
+// Compute integrals for the core Hamilton matrix 
 CMSStatus_t
 CMS_computePairCoreH_Simint(BasisSet_t basis, Simint_t simint, int tid,
                            int A, int B,

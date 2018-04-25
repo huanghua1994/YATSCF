@@ -159,9 +159,9 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	double et = get_wtime_sec();
 	TinySCF->init_time = et - st;
 	
-	// Print memory usage
-	printf("TinySCF initialization over, memory usage: %.2lf MB,  \t", TinySCF->mem_size / 1048576.0);
-	printf("elapsed time = %.3lf (s)\n", TinySCF->init_time);
+	// Print memory usage and time consumption
+	printf("TinySCF memory usage    = %.2lf MB\n", TinySCF->mem_size / 1048576.0);
+	printf("TinySCF memory allocation and initialization over, elapsed time = %.3lf (s)\n", TinySCF->init_time);
 }
 
 
@@ -271,8 +271,7 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 	TinySCF->S_Hcore_time = et - st;
 	
 	// Print runtime
-	printf("TinySCF precompute Hcore, S, and X matrices over,    \t");
-	printf("elapsed time = %.3lf (s)\n", TinySCF->S_Hcore_time);
+	printf("TinySCF precompute Hcore, S, and X matrices over,  elapsed time = %.3lf (s)\n", TinySCF->S_Hcore_time);
 }
 
 void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
@@ -317,7 +316,7 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 	}
 	TinySCF->max_scrval = global_max_scrval;
 	
-	// Recreate Simint object to reset its statistic info
+	// Reset Simint statistic info
 	CMS_Simint_resetStatisInfo(TinySCF->simint);
 	
 	// Generate unique shell pairs that survive Schwarz screening
@@ -349,8 +348,7 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 	TinySCF->shell_scr_time = et - st;
 	
 	// Print runtime
-	printf("TinySCF precompute shell screening info over,        \t");
-	printf("elapsed time = %.3lf (s)\n", TinySCF->shell_scr_time);
+	printf("TinySCF precompute shell screening info over,      elapsed time = %.3lf (s)\n", TinySCF->shell_scr_time);
 }
 
 void TinySCF_get_initial_guess(TinySCF_t TinySCF)
@@ -439,7 +437,7 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		
 		et0 = get_wtime_sec();
 		
-		printf("* Iteration runtime   : %.3lf (s)\n", et0 - st0);
+		printf("* Iteration runtime     = %.3lf (s)\n", et0 - st0);
 		printf("* Energy = %.10lf (%.10lf)", TinySCF->HF_energy + TinySCF->nuc_energy, TinySCF->HF_energy);
 		if (TinySCF->iter > 0) printf(", delta = %e\n", energy_delta); else printf("\n");
 		
