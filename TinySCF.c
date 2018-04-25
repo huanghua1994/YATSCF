@@ -100,18 +100,18 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->shell_bf_sind[TinySCF->nshells] = TinySCF->nbasfuncs;
 	
 	// Allocate memory for matrices and temporary arrays used in SCF
-	int mat_mem_size   = DBL_SIZE * TinySCF->mat_size;
-	TinySCF->Hcore_mat = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->S_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->F_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->D_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->J_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->K_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->X_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->tmp_mat   = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->Cocc_mat  = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->n_occ * TinySCF->nbasfuncs);
-	TinySCF->eigval    = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nbasfuncs);
-	TinySCF->ev_idx    = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nbasfuncs);
+	size_t mat_mem_size = DBL_SIZE * TinySCF->mat_size;
+	TinySCF->Hcore_mat  = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->S_mat      = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->F_mat      = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->D_mat      = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->J_mat      = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->K_mat      = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->X_mat      = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->tmp_mat    = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->Cocc_mat   = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->n_occ * TinySCF->nbasfuncs);
+	TinySCF->eigval     = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nbasfuncs);
+	TinySCF->ev_idx     = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nbasfuncs);
 	assert(TinySCF->Hcore_mat != NULL);
 	assert(TinySCF->S_mat     != NULL);
 	assert(TinySCF->F_mat     != NULL);
@@ -128,7 +128,7 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->mem_size += (double) ((DBL_SIZE + INT_SIZE) * TinySCF->nbasfuncs);
 
 	// Allocate memory for matrices and temporary arrays used in DIIS
-	int DIIS_row_memsize = DBL_SIZE * (MAX_DIIS + 1);
+	size_t DIIS_row_memsize = DBL_SIZE * (MAX_DIIS + 1);
 	TinySCF->F0_mat    = (double*) ALIGN64B_MALLOC(mat_mem_size * MAX_DIIS);
 	TinySCF->R_mat     = (double*) ALIGN64B_MALLOC(mat_mem_size * MAX_DIIS);
 	TinySCF->B_mat     = (double*) ALIGN64B_MALLOC(DIIS_row_memsize * (MAX_DIIS + 1));
