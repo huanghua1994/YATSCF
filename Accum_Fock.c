@@ -31,23 +31,6 @@ static inline void atomic_add_f64(volatile double *global_value, double addend)
 	} while (!__sync_bool_compare_and_swap((volatile uint64_t*)global_value, expected_value, new_value));
 }
 
-static inline void atomic_update_global_block(
-	double *global_block, double *local_block,
-	int nrows, int ncols, int ldg
-)
-{
-	for (int irow = 0; irow < nrows; irow++)
-	{
-		int base1 = irow * ncols;
-		int base2 = irow * ldg;
-		for (int icol = 0; icol < ncols; icol++)
-		{
-			double addend = local_block[base1 + icol];
-			atomic_add_f64(&global_block[base2 + icol], addend);
-		}
-	}
-}
-
 static inline void atomic_update_vector(double *dst, double *src, int length)
 {
 	for (int i = 0; i < length; i++)

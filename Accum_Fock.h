@@ -3,39 +3,21 @@
 
 #include "TinySCF.h"
 
-void Accum_Fock(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
-);
+#define ACCUM_FOCK_IN_PARAM TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, \
+							double *ERI, int load_MN, int load_P, int write_MN, int write_P
 
-void Accum_Fock_dimQ1(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
-);
+void Accum_Fock(ACCUM_FOCK_IN_PARAM);
 
-void Accum_Fock_dimQ3(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
-);
+void Accum_Fock_dimQ1(ACCUM_FOCK_IN_PARAM);
 
-void Accum_Fock_dimQ6(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
-);
+void Accum_Fock_dimQ3(ACCUM_FOCK_IN_PARAM);
 
-void Accum_Fock_dimQ10(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
-);
+void Accum_Fock_dimQ6(ACCUM_FOCK_IN_PARAM);
 
-void Accum_Fock_dimQ15(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
-);
+void Accum_Fock_dimQ10(ACCUM_FOCK_IN_PARAM);
 
-void Accum_Fock_1111(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
-);
+void Accum_Fock_dimQ15(ACCUM_FOCK_IN_PARAM);
+
+void Accum_Fock_1111(ACCUM_FOCK_IN_PARAM);
 
 #endif
