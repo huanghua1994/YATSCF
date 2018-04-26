@@ -48,6 +48,12 @@ static inline void atomic_update_global_block(
 	}
 }
 
+static inline void atomic_update_vector(double *dst, double *src, int length)
+{
+	for (int i = 0; i < length; i++)
+		atomic_add_f64(&dst[i], src[i]);
+}
+
 void Accum_Fock(
 	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
 	int load_MN, int load_P, int write_MN, int write_P
@@ -63,14 +69,15 @@ void Accum_Fock(
 	int idxN = TinySCF->shell_bf_sind[N];
 	int idxP = TinySCF->shell_bf_sind[P];
 	int idxQ = TinySCF->shell_bf_sind[Q];
+	int nshells = TinySCF->nshells;
 	
 	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat + idxM * nbf + idxN;
-	double *J_PQ = TinySCF->J_mat + idxP * nbf + idxQ;
-	double *K_MP = TinySCF->K_mat + idxM * nbf + idxP;
-	double *K_NP = TinySCF->K_mat + idxN * nbf + idxP;
-	double *K_MQ = TinySCF->K_mat + idxM * nbf + idxQ;
-	double *K_NQ = TinySCF->K_mat + idxN * nbf + idxQ;
+	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
 	double *D_MN = TinySCF->D_mat + idxM * nbf + idxN;
 	double *D_PQ = TinySCF->D_mat + idxP * nbf + idxQ;
@@ -140,17 +147,17 @@ void Accum_Fock(
 	} // for (int iN = 0; iN < dimN; iN++)
 	
 	// Update to global array using atomic_add_f64()
-	if (write_MN) atomic_update_global_block(J_MN, J_MN_buf, dimM, dimN, nbf);
+	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
 	
 	if (write_P)
 	{
-		atomic_update_global_block(K_MP, K_MP_buf, dimM, dimP, nbf);
-		atomic_update_global_block(K_NP, K_NP_buf, dimN, dimP, nbf);
+		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
+		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
 	}
 	
-	atomic_update_global_block(J_PQ, J_PQ_buf, dimP, dimQ, nbf);
-	atomic_update_global_block(K_MQ, K_MQ_buf, dimM, dimQ, nbf);
-	atomic_update_global_block(K_NQ, K_NQ_buf, dimN, dimQ, nbf);
+	atomic_update_vector(J_PQ, J_PQ_buf, dimP * dimQ);
+	atomic_update_vector(K_MQ, K_MQ_buf, dimM * dimQ);
+	atomic_update_vector(K_NQ, K_NQ_buf, dimN * dimQ);
 }
 
 // ----- Specialized implementations of Accum_Fock with different dimQ -----
