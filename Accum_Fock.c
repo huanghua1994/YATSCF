@@ -139,10 +139,10 @@ void Accum_Fock(
 					K_MQ_buf[iM_dimQ + iQ] += ncoef4_D_NP * I;
 					K_NQ_buf[iN_dimQ + iQ] += ncoef5_D_MP * I;
 				}
-				K_MP_buf[iM * dimP + iP] += coef[2] * k_MP;
-				K_NP_buf[iN * dimP + iP] += coef[3] * k_NP;
+				K_MP_buf[iM_dimP + iP] += coef[2] * k_MP;
+				K_NP_buf[iN_dimP + iP] += coef[3] * k_NP;
 			} // for (int iM = 0; iM < dimM; iM++) 
-			J_MN_buf[iM * dimN + iN] += coef[0] * j_MN;
+			J_MN_buf[iM_dimN + iN] += coef[0] * j_MN;
 		} // for (int iQ = 0; iQ < dimQ; iQ++) 
 	} // for (int iN = 0; iN < dimN; iN++)
 	
