@@ -50,14 +50,17 @@ struct TinySCF_struct
 	double *F_mat;        // Fock matrix
 	double *D_mat;        // Density matrix
 	double *J_mat;        // Coulomb matrix   ((J+J^T)/2 is the actual Coulomb matrix)
-	double *J_mat_block;
-	double *K_mat;        // Exchange matrix  ((K+K^T)/2 is the actual Exchange matrix)
-	double *K_mat_block; 
+	double *K_mat;        // Exchange matrix  ((K+K^T)/2 is the actual Exchange matrix) 
 	double *X_mat;        // Basis transformation matrix
 	double *Cocc_mat;     // Temporary matrix for building density matrix
 	double *eigval;       // Eigenvalues for building density matrix
 	int    *ev_idx;       // Index of eigenvalues, for sorting
 	double *tmp_mat;      // Temporary matrix
+	
+	// Blocked J, K and D matrices and the offsets of each block
+	double *J_mat_block;  
+	double *K_mat_block;
+	double *D_mat_block;
 	int    *mat_block_ptr;
 	
 	// Matrices and arrays for DIIS

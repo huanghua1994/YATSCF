@@ -79,12 +79,12 @@ void Accum_Fock(
 	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
 	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
-	double *D_MN = TinySCF->D_mat + idxM * nbf + idxN;
-	double *D_PQ = TinySCF->D_mat + idxP * nbf + idxQ;
-	double *D_MP = TinySCF->D_mat + idxM * nbf + idxP;
-	double *D_NP = TinySCF->D_mat + idxN * nbf + idxP;
-	double *D_MQ = TinySCF->D_mat + idxM * nbf + idxQ;
-	double *D_NQ = TinySCF->D_mat + idxN * nbf + idxQ;
+	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
 	// Set buffer pointer
 	double *thread_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
@@ -109,21 +109,21 @@ void Accum_Fock(
 	
 	for (int iM = 0; iM < dimM; iM++) 
 	{
+		int iM_dimP = iM * dimP;
+		int iM_dimN = iM * dimN;
+		int iM_dimQ = iM * dimQ;
 		for (int iN = 0; iN < dimN; iN++) 
 		{
-			int iM_nbf  = iM * nbf;
-			int iN_nbf  = iN * nbf;
-			int iM_dimQ = iM * dimQ;
+			int iN_dimP = iN * dimP;
 			int iN_dimQ = iN * dimQ;
-			double coef1_D_MN = coef[1] * D_MN[iM_nbf + iN];
+			double coef1_D_MN = coef[1] * D_MN[iM_dimN + iN];
 			double j_MN = 0.0;
 			for (int iP = 0; iP < dimP; iP++) 
 			{
-				int iP_nbf  = iP * nbf;
 				int iP_dimQ = iP * dimQ;
 				int Ibase = dimQ * (iP + dimP * (iN + dimN * iM));
-				double ncoef4_D_NP = -coef[4] * D_NP[iN_nbf + iP];
-				double ncoef5_D_MP = -coef[5] * D_MP[iM_nbf + iP];
+				double ncoef4_D_NP = -coef[4] * D_NP[iN_dimP + iP];
+				double ncoef5_D_MP = -coef[5] * D_MP[iM_dimP + iP];
 				double k_MP = 0.0, k_NP = 0.0;
 				// dimQ is small, vectorizing short loops may hurt performance 
 				// since it needs horizon reduction after the loop
@@ -131,9 +131,9 @@ void Accum_Fock(
 				{
 					double I = ERI[Ibase + iQ];
 					
-					j_MN += D_PQ[iP_nbf + iQ] * I;
-					k_MP -= D_NQ[iN_nbf + iQ] * I;
-					k_NP -= D_MQ[iM_nbf + iQ] * I;
+					j_MN += D_PQ[iP_dimQ + iQ] * I;
+					k_MP -= D_NQ[iN_dimQ + iQ] * I;
+					k_NP -= D_MQ[iM_dimQ + iQ] * I;
 
 					J_PQ_buf[iP_dimQ + iQ] +=  coef1_D_MN * I;
 					K_MQ_buf[iM_dimQ + iQ] += ncoef4_D_NP * I;

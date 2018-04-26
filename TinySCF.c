@@ -106,33 +106,38 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->F_mat         = (double*) ALIGN64B_MALLOC(mat_mem_size);
 	TinySCF->D_mat         = (double*) ALIGN64B_MALLOC(mat_mem_size);
 	TinySCF->J_mat         = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->J_mat_block   = (double*) ALIGN64B_MALLOC(mat_mem_size);
 	TinySCF->K_mat         = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->K_mat_block   = (double*) ALIGN64B_MALLOC(mat_mem_size);
 	TinySCF->X_mat         = (double*) ALIGN64B_MALLOC(mat_mem_size);
 	TinySCF->tmp_mat       = (double*) ALIGN64B_MALLOC(mat_mem_size);
 	TinySCF->Cocc_mat      = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->n_occ * TinySCF->nbasfuncs);
 	TinySCF->eigval        = (double*) ALIGN64B_MALLOC(DBL_SIZE * TinySCF->nbasfuncs);
 	TinySCF->ev_idx        = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nbasfuncs);
-	TinySCF->mat_block_ptr = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshellpairs);
 	assert(TinySCF->Hcore_mat     != NULL);
 	assert(TinySCF->S_mat         != NULL);
 	assert(TinySCF->F_mat         != NULL);
 	assert(TinySCF->D_mat         != NULL);
 	assert(TinySCF->J_mat         != NULL);
-	assert(TinySCF->J_mat_block   != NULL);
 	assert(TinySCF->K_mat         != NULL);
-	assert(TinySCF->K_mat_block   != NULL);
 	assert(TinySCF->X_mat         != NULL);
 	assert(TinySCF->tmp_mat       != NULL);
 	assert(TinySCF->Cocc_mat      != NULL);
 	assert(TinySCF->eigval        != NULL);
-	assert(TinySCF->mat_block_ptr != NULL);
-	TinySCF->mem_size += (double) (10 * mat_mem_size);
+	TinySCF->mem_size += (double) (8 * mat_mem_size);
 	TinySCF->mem_size += (double) (DBL_SIZE * TinySCF->n_occ * TinySCF->nbasfuncs);
 	TinySCF->mem_size += (double) ((DBL_SIZE + INT_SIZE) * TinySCF->nbasfuncs);
-	TinySCF->mem_size += (double) (INT_SIZE * TinySCF->nshellpairs);
 	
+	// Allocate memory for blocked J, K and D matrices and the offsets of each block
+	// and compute the offsets of each block of J, K and D matrices
+	TinySCF->mat_block_ptr = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshellpairs);
+	TinySCF->J_mat_block   = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->K_mat_block   = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->D_mat_block   = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	assert(TinySCF->mat_block_ptr != NULL);
+	assert(TinySCF->J_mat_block   != NULL);
+	assert(TinySCF->K_mat_block   != NULL);
+	assert(TinySCF->D_mat_block   != NULL);
+	TinySCF->mem_size += (double) (3 * mat_mem_size);
+	TinySCF->mem_size += (double) (INT_SIZE * TinySCF->nshellpairs);
 	int pos = 0, idx = 0;
 	for (int i = 0; i < TinySCF->nshells; i++)
 	{
@@ -204,15 +209,18 @@ void free_TinySCF(TinySCF_t TinySCF)
 	ALIGN64B_FREE(TinySCF->F_mat);
 	ALIGN64B_FREE(TinySCF->D_mat);
 	ALIGN64B_FREE(TinySCF->J_mat);
-	ALIGN64B_FREE(TinySCF->J_mat_block);
 	ALIGN64B_FREE(TinySCF->K_mat);
-	ALIGN64B_FREE(TinySCF->K_mat_block);
 	ALIGN64B_FREE(TinySCF->X_mat);
 	ALIGN64B_FREE(TinySCF->tmp_mat);
 	ALIGN64B_FREE(TinySCF->Cocc_mat);
 	ALIGN64B_FREE(TinySCF->eigval);
 	ALIGN64B_FREE(TinySCF->ev_idx);
+	
+	// Free blocked J, K and D matrices and the offsets of each block
 	ALIGN64B_FREE(TinySCF->mat_block_ptr);
+	ALIGN64B_FREE(TinySCF->J_mat_block);
+	ALIGN64B_FREE(TinySCF->K_mat_block);
+	ALIGN64B_FREE(TinySCF->D_mat_block);
 	
 	// Free matrices and temporary arrays used in DIIS
 	ALIGN64B_FREE(TinySCF->F0_mat);

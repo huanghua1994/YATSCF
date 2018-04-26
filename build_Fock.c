@@ -56,7 +56,7 @@ void Accum_Fock_with_KetshellpairList(
 }
 
 // F = H_core + (J + J^T) / 2 + (K + K^T) / 2;
-void TinySCF_HJKmat_to_Fmat(double *Hcore_mat, double *J_mat, double *K_mat, double *F_mat, int nbf)
+static void TinySCF_HJKmat_to_Fmat(double *Hcore_mat, double *J_mat, double *K_mat, double *F_mat, int nbf)
 {
 	#pragma omp for
 	for (int irow = 0; irow < nbf; irow++)
@@ -75,7 +75,7 @@ void TinySCF_HJKmat_to_Fmat(double *Hcore_mat, double *J_mat, double *K_mat, dou
 	}
 }
 
-void TinySCF_JKmatblock_to_JKmat(
+static void TinySCF_JKmatblock_to_JKmat(
 	double *J_mat, double *K_mat, double *J_mat_block, double *K_mat_block,
 	int *mat_block_ptr, int *shell_bf_num, int *shell_bf_sind, int nshells, int nbf
 )
@@ -101,6 +101,27 @@ void TinySCF_JKmatblock_to_JKmat(
 	}
 }
 
+static void TinySCF_Dmat_to_Dmatblock(
+	double *D_mat, double *D_mat_block,	int *mat_block_ptr, 
+	int *shell_bf_num, int *shell_bf_sind, int nshells, int nbf
+)
+{
+	#pragma omp for
+	for (int i = 0; i < nshells; i++)
+	{
+		for (int j = 0; j < nshells; j++)
+		{
+			int mat_block_pos  = mat_block_ptr[i * nshells + j];
+			int global_mat_pos = shell_bf_sind[i] * nbf + shell_bf_sind[j];
+			copy_matrix_block(
+				D_mat_block + mat_block_pos, shell_bf_num[j],
+				D_mat + global_mat_pos, nbf, 
+				shell_bf_num[i], shell_bf_num[j]
+			);
+		}
+	}
+}
+
 void TinySCF_build_FockMat(TinySCF_t TinySCF)
 {
 	// Copy some parameters out, I don't want to see so many "TinySCF->"
@@ -116,12 +137,13 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 	Simint_t simint     = TinySCF->simint;
 	double *J_mat       = TinySCF->J_mat;
 	double *K_mat       = TinySCF->K_mat;
-	double *J_mat_block = TinySCF->J_mat_block;
-	double *K_mat_block = TinySCF->K_mat_block;
 	double *F_mat       = TinySCF->F_mat;
 	double *D_mat       = TinySCF->D_mat;
 	double *Hcore_mat   = TinySCF->Hcore_mat;
 	int *mat_block_ptr  = TinySCF->mat_block_ptr;
+	double *J_mat_block = TinySCF->J_mat_block;
+	double *K_mat_block = TinySCF->K_mat_block;
+	double *D_mat_block = TinySCF->D_mat_block;
 	
 	memset(J_mat_block, 0, DBL_SIZE * TinySCF->mat_size);
 	memset(K_mat_block, 0, DBL_SIZE * TinySCF->mat_size);
@@ -129,6 +151,11 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 	#pragma omp parallel
 	{
 		int tid = omp_get_thread_num();
+		
+		TinySCF_Dmat_to_Dmatblock(
+			D_mat, D_mat_block, mat_block_ptr,
+			shell_bf_num, shell_bf_sind, nshells, num_bas_func
+		);
 		
 		// Create ERI batching auxiliary data structures
 		// Ket-side shell pair lists that needs to be computed
