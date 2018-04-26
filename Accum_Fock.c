@@ -65,10 +65,6 @@ void Accum_Fock(
 	int dimN = TinySCF->shell_bf_num[N];
 	int dimP = TinySCF->shell_bf_num[P];
 	int dimQ = TinySCF->shell_bf_num[Q];
-	int idxM = TinySCF->shell_bf_sind[M];
-	int idxN = TinySCF->shell_bf_sind[N];
-	int idxP = TinySCF->shell_bf_sind[P];
-	int idxQ = TinySCF->shell_bf_sind[Q];
 	int nshells = TinySCF->nshells;
 	
 	// Set global matrix pointers
@@ -141,10 +137,10 @@ void Accum_Fock(
 				}
 				K_MP_buf[iM_dimP + iP] += coef[2] * k_MP;
 				K_NP_buf[iN_dimP + iP] += coef[3] * k_NP;
-			} // for (int iM = 0; iM < dimM; iM++) 
+			}  // for (int iP = 0; iP < dimP; iP++) 
 			J_MN_buf[iM_dimN + iN] += coef[0] * j_MN;
-		} // for (int iQ = 0; iQ < dimQ; iQ++) 
-	} // for (int iN = 0; iN < dimN; iN++)
+		} // for (int iN = 0; iN < dimN; iN++) 
+	} // for (int iM = 0; iM < dimM; iM++) 
 	
 	// Update to global array using atomic_add_f64()
 	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
@@ -173,26 +169,23 @@ void Accum_Fock_dimQ1(
 	int dimM = TinySCF->shell_bf_num[M];
 	int dimN = TinySCF->shell_bf_num[N];
 	int dimP = TinySCF->shell_bf_num[P];
-	int dimQ = 1; // TinySCF->shell_bf_num[Q];
-	int idxM = TinySCF->shell_bf_sind[M];
-	int idxN = TinySCF->shell_bf_sind[N];
-	int idxP = TinySCF->shell_bf_sind[P];
-	int idxQ = TinySCF->shell_bf_sind[Q];
+	int dimQ = TinySCF->shell_bf_num[Q];
+	int nshells = TinySCF->nshells;
 	
 	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat + idxM * nbf + idxN;
-	double *J_PQ = TinySCF->J_mat + idxP * nbf + idxQ;
-	double *K_MP = TinySCF->K_mat + idxM * nbf + idxP;
-	double *K_NP = TinySCF->K_mat + idxN * nbf + idxP;
-	double *K_MQ = TinySCF->K_mat + idxM * nbf + idxQ;
-	double *K_NQ = TinySCF->K_mat + idxN * nbf + idxQ;
+	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
-	double *D_MN = TinySCF->D_mat + idxM * nbf + idxN;
-	double *D_PQ = TinySCF->D_mat + idxP * nbf + idxQ;
-	double *D_MP = TinySCF->D_mat + idxM * nbf + idxP;
-	double *D_NP = TinySCF->D_mat + idxN * nbf + idxP;
-	double *D_MQ = TinySCF->D_mat + idxM * nbf + idxQ;
-	double *D_NQ = TinySCF->D_mat + idxN * nbf + idxQ;
+	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
 	// Set buffer pointer
 	double *thread_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
@@ -217,48 +210,47 @@ void Accum_Fock_dimQ1(
 	
 	for (int iM = 0; iM < dimM; iM++) 
 	{
+		int iM_dimN = iM * dimN;
 		for (int iN = 0; iN < dimN; iN++) 
 		{
-			int iM_nbf  = iM * nbf;
-			int iN_nbf  = iN * nbf;
 			int iM_dimP = iM * dimP;
 			int iN_dimP = iN * dimP;
-			double coef1_D_MN = coef[1] * D_MN[iM * nbf + iN];
+			double coef1_D_MN = coef[1] * D_MN[iM_dimN + iN];
 			double j_MN = 0.0, k_MQ = 0.0, k_NQ = 0.0;
 			int Ibase = dimP * (iN + dimN * iM);
 			for (int iP = 0; iP < dimP; iP++) 
 			{
-				double ncoef4_D_NP = -coef[4] * D_NP[iN_nbf + iP];
-				double ncoef5_D_MP = -coef[5] * D_MP[iM_nbf + iP];
+				double ncoef4_D_NP = -coef[4] * D_NP[iN_dimP + iP];
+				double ncoef5_D_MP = -coef[5] * D_MP[iM_dimP + iP];
 
 				double I = ERI[Ibase + iP];
 				
-				j_MN += D_PQ[iP * nbf] * I;
+				j_MN += D_PQ[iP] * I;
 				k_MQ += ncoef4_D_NP * I;
 				k_NQ += ncoef5_D_MP * I;
 
 				J_PQ_buf[iP] += coef1_D_MN * I;
-				K_MP_buf[iM_dimP + iP] -= coef[2] * D_NQ[iN_nbf] * I;
-				K_NP_buf[iN_dimP + iP] -= coef[3] * D_MQ[iM_nbf] * I;
-			} // for (int iM = 0; iM < dimM; iM++) 
+				K_MP_buf[iM_dimP + iP] -= coef[2] * D_NQ[iN] * I;
+				K_NP_buf[iN_dimP + iP] -= coef[3] * D_MQ[iM] * I;
+			}  // for (int iP = 0; iP < dimP; iP++)  
 			K_MQ_buf[iM] += k_MQ;
 			K_NQ_buf[iN] += k_NQ;
-			J_MN_buf[iM * dimN + iN] += coef[0] * j_MN;
-		} // for (int iQ = 0; iQ < dimQ; iQ++) 
-	} // for (int iN = 0; iN < dimN; iN++)
+			J_MN_buf[iM_dimN + iN] += coef[0] * j_MN;
+		}  // for (int iN = 0; iN < dimN; iN++) 
+	}  // for (int iM = 0; iM < dimM; iM++) 
 	
 	// Update to global array using atomic_add_f64()
-	if (write_MN) atomic_update_global_block(J_MN, J_MN_buf, dimM, dimN, nbf);
+	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
 	
 	if (write_P)
 	{
-		atomic_update_global_block(K_MP, K_MP_buf, dimM, dimP, nbf);
-		atomic_update_global_block(K_NP, K_NP_buf, dimN, dimP, nbf);
+		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
+		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
 	}
 	
-	atomic_update_global_block(J_PQ, J_PQ_buf, dimP, dimQ, nbf);
-	atomic_update_global_block(K_MQ, K_MQ_buf, dimM, dimQ, nbf);
-	atomic_update_global_block(K_NQ, K_NQ_buf, dimN, dimQ, nbf);
+	atomic_update_vector(J_PQ, J_PQ_buf, dimP * dimQ);
+	atomic_update_vector(K_MQ, K_MQ_buf, dimM * dimQ);
+	atomic_update_vector(K_NQ, K_NQ_buf, dimN * dimQ);
 }
 
 void Accum_Fock_dimQ3(
@@ -271,43 +263,40 @@ void Accum_Fock_dimQ3(
 	int dimM = TinySCF->shell_bf_num[M];
 	int dimN = TinySCF->shell_bf_num[N];
 	int dimP = TinySCF->shell_bf_num[P];
-	int dimQ = 3; //TinySCF->shell_bf_num[Q];
-	int idxM = TinySCF->shell_bf_sind[M];
-	int idxN = TinySCF->shell_bf_sind[N];
-	int idxP = TinySCF->shell_bf_sind[P];
-	int idxQ = TinySCF->shell_bf_sind[Q];
+	int dimQ = 3; // TinySCF->shell_bf_num[Q];
+	int nshells = TinySCF->nshells;
 	
 	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat + idxM * nbf + idxN;
-	double *J_PQ = TinySCF->J_mat + idxP * nbf + idxQ;
-	double *K_MP = TinySCF->K_mat + idxM * nbf + idxP;
-	double *K_NP = TinySCF->K_mat + idxN * nbf + idxP;
-	double *K_MQ = TinySCF->K_mat + idxM * nbf + idxQ;
-	double *K_NQ = TinySCF->K_mat + idxN * nbf + idxQ;
+	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
-	double *D_MN = TinySCF->D_mat + idxM * nbf + idxN;
-	double *D_PQ = TinySCF->D_mat + idxP * nbf + idxQ;
-	double *D_MP = TinySCF->D_mat + idxM * nbf + idxP;
-	double *D_NP = TinySCF->D_mat + idxN * nbf + idxP;
-	double *D_MQ = TinySCF->D_mat + idxM * nbf + idxQ;
-	double *D_NQ = TinySCF->D_mat + idxN * nbf + idxQ;
+	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
 	// Set buffer pointer
 	double *thread_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
-	int required_buf_size = (dimP + dimN + dimM) * dimQ + (dimP + dimN + dimM) * dimQ;
+	int required_buf_size = (dimP + dimN + dimM) * 3 + (dimP + dimN + dimM) * 3;
 	assert(required_buf_size <= TinySCF->max_buf_size);
 	double *write_buf = thread_buf;
 	double *J_MN_buf = write_buf;  write_buf += dimM * dimN;
 	double *K_MP_buf = write_buf;  write_buf += dimM * dimP;
 	double *K_NP_buf = write_buf;  write_buf += dimN * dimP;
-	double *J_PQ_buf = write_buf;  write_buf += dimP * dimQ;
-	double *K_NQ_buf = write_buf;  write_buf += dimN * dimQ;
-	double *K_MQ_buf = write_buf;  write_buf += dimM * dimQ;
+	double *J_PQ_buf = write_buf;  write_buf += dimP * 3;
+	double *K_NQ_buf = write_buf;  write_buf += dimN * 3;
+	double *K_MQ_buf = write_buf;  write_buf += dimM * 3;
 
 	// Reset result buffer
 	if (load_MN) memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
 	if (load_P)  memset(K_MP_buf, 0, sizeof(double) * dimP * (dimM + dimN));
-	memset(J_PQ_buf, 0, sizeof(double) * dimQ * (dimM + dimN + dimP));
+	memset(J_PQ_buf, 0, sizeof(double) * 3 * (dimM + dimN + dimP));
 	
 	// Get uniqueness ERI symmetric 
 	double coef[7];
@@ -315,54 +304,55 @@ void Accum_Fock_dimQ3(
 	
 	for (int iM = 0; iM < dimM; iM++) 
 	{
+		int iM_dimP = iM * dimP;
+		int iM_dimN = iM * dimN;
+		int iM_dimQ = iM * 3;
 		for (int iN = 0; iN < dimN; iN++) 
 		{
-			int iM_nbf  = iM * nbf;
-			int iN_nbf  = iN * nbf;
-			int iM_dimQ = iM * dimQ;
-			int iN_dimQ = iN * dimQ;
-			double coef1_D_MN = coef[1] * D_MN[iM_nbf + iN];
+			int iN_dimP = iN * dimP;
+			int iN_dimQ = iN * 3;
+			double coef1_D_MN = coef[1] * D_MN[iM_dimN + iN];
 			double j_MN = 0.0;
 			for (int iP = 0; iP < dimP; iP++) 
 			{
-				int iP_nbf  = iP * nbf;
-				int iP_dimQ = iP * dimQ;
-				int Ibase = dimQ * (iP + dimP * (iN + dimN * iM));
-				double ncoef4_D_NP = -coef[4] * D_NP[iN_nbf + iP];
-				double ncoef5_D_MP = -coef[5] * D_MP[iM_nbf + iP];
+				int iP_dimQ = iP * 3;
+				int Ibase = 3 * (iP + dimP * (iN + dimN * iM));
+				double ncoef4_D_NP = -coef[4] * D_NP[iN_dimP + iP];
+				double ncoef5_D_MP = -coef[5] * D_MP[iM_dimP + iP];
 				double k_MP = 0.0, k_NP = 0.0;
 				
-				for (int iQ = 0; iQ < dimQ; iQ++) 
+				
+				for (int iQ = 0; iQ < 3; iQ++) 
 				{
 					double I = ERI[Ibase + iQ];
 					
-					j_MN += D_PQ[iP_nbf + iQ] * I;
-					k_MP -= D_NQ[iN_nbf + iQ] * I;
-					k_NP -= D_MQ[iM_nbf + iQ] * I;
+					j_MN += D_PQ[iP_dimQ + iQ] * I;
+					k_MP -= D_NQ[iN_dimQ + iQ] * I;
+					k_NP -= D_MQ[iM_dimQ + iQ] * I;
 
 					J_PQ_buf[iP_dimQ + iQ] +=  coef1_D_MN * I;
 					K_MQ_buf[iM_dimQ + iQ] += ncoef4_D_NP * I;
 					K_NQ_buf[iN_dimQ + iQ] += ncoef5_D_MP * I;
 				}
-				K_MP_buf[iM * dimP + iP] += coef[2] * k_MP;
-				K_NP_buf[iN * dimP + iP] += coef[3] * k_NP;
-			} // for (int iM = 0; iM < dimM; iM++) 
-			J_MN_buf[iM * dimN + iN] += coef[0] * j_MN;
-		} // for (int iQ = 0; iQ < dimQ; iQ++) 
-	} // for (int iN = 0; iN < dimN; iN++)
+				K_MP_buf[iM_dimP + iP] += coef[2] * k_MP;
+				K_NP_buf[iN_dimP + iP] += coef[3] * k_NP;
+			}  // for (int iP = 0; iP < dimP; iP++) 
+			J_MN_buf[iM_dimN + iN] += coef[0] * j_MN;
+		}  // for (int iN = 0; iN < dimN; iN++) 
+	}  // for (int iM = 0; iM < dimM; iM++) 
 	
 	// Update to global array using atomic_add_f64()
-	if (write_MN) atomic_update_global_block(J_MN, J_MN_buf, dimM, dimN, nbf);
+	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
 	
 	if (write_P)
 	{
-		atomic_update_global_block(K_MP, K_MP_buf, dimM, dimP, nbf);
-		atomic_update_global_block(K_NP, K_NP_buf, dimN, dimP, nbf);
+		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
+		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
 	}
 	
-	atomic_update_global_block(J_PQ, J_PQ_buf, dimP, dimQ, nbf);
-	atomic_update_global_block(K_MQ, K_MQ_buf, dimM, dimQ, nbf);
-	atomic_update_global_block(K_NQ, K_NQ_buf, dimN, dimQ, nbf);
+	atomic_update_vector(J_PQ, J_PQ_buf, dimP * 3);
+	atomic_update_vector(K_MQ, K_MQ_buf, dimM * 3);
+	atomic_update_vector(K_NQ, K_NQ_buf, dimN * 3);
 }
 
 void Accum_Fock_dimQ6(
@@ -375,43 +365,40 @@ void Accum_Fock_dimQ6(
 	int dimM = TinySCF->shell_bf_num[M];
 	int dimN = TinySCF->shell_bf_num[N];
 	int dimP = TinySCF->shell_bf_num[P];
-	int dimQ = 6; //TinySCF->shell_bf_num[Q];
-	int idxM = TinySCF->shell_bf_sind[M];
-	int idxN = TinySCF->shell_bf_sind[N];
-	int idxP = TinySCF->shell_bf_sind[P];
-	int idxQ = TinySCF->shell_bf_sind[Q];
+	int dimQ = 6; // TinySCF->shell_bf_num[Q];
+	int nshells = TinySCF->nshells;
 	
 	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat + idxM * nbf + idxN;
-	double *J_PQ = TinySCF->J_mat + idxP * nbf + idxQ;
-	double *K_MP = TinySCF->K_mat + idxM * nbf + idxP;
-	double *K_NP = TinySCF->K_mat + idxN * nbf + idxP;
-	double *K_MQ = TinySCF->K_mat + idxM * nbf + idxQ;
-	double *K_NQ = TinySCF->K_mat + idxN * nbf + idxQ;
+	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
-	double *D_MN = TinySCF->D_mat + idxM * nbf + idxN;
-	double *D_PQ = TinySCF->D_mat + idxP * nbf + idxQ;
-	double *D_MP = TinySCF->D_mat + idxM * nbf + idxP;
-	double *D_NP = TinySCF->D_mat + idxN * nbf + idxP;
-	double *D_MQ = TinySCF->D_mat + idxM * nbf + idxQ;
-	double *D_NQ = TinySCF->D_mat + idxN * nbf + idxQ;
+	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
 	// Set buffer pointer
 	double *thread_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
-	int required_buf_size = (dimP + dimN + dimM) * dimQ + (dimP + dimN + dimM) * dimQ;
+	int required_buf_size = (dimP + dimN + dimM) * 6 + (dimP + dimN + dimM) * 6;
 	assert(required_buf_size <= TinySCF->max_buf_size);
 	double *write_buf = thread_buf;
 	double *J_MN_buf = write_buf;  write_buf += dimM * dimN;
 	double *K_MP_buf = write_buf;  write_buf += dimM * dimP;
 	double *K_NP_buf = write_buf;  write_buf += dimN * dimP;
-	double *J_PQ_buf = write_buf;  write_buf += dimP * dimQ;
-	double *K_NQ_buf = write_buf;  write_buf += dimN * dimQ;
-	double *K_MQ_buf = write_buf;  write_buf += dimM * dimQ;
+	double *J_PQ_buf = write_buf;  write_buf += dimP * 6;
+	double *K_NQ_buf = write_buf;  write_buf += dimN * 6;
+	double *K_MQ_buf = write_buf;  write_buf += dimM * 6;
 
 	// Reset result buffer
 	if (load_MN) memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
 	if (load_P)  memset(K_MP_buf, 0, sizeof(double) * dimP * (dimM + dimN));
-	memset(J_PQ_buf, 0, sizeof(double) * dimQ * (dimM + dimN + dimP));
+	memset(J_PQ_buf, 0, sizeof(double) * 6 * (dimM + dimN + dimP));
 	
 	// Get uniqueness ERI symmetric 
 	double coef[7];
@@ -419,55 +406,54 @@ void Accum_Fock_dimQ6(
 	
 	for (int iM = 0; iM < dimM; iM++) 
 	{
+		int iM_dimP = iM * dimP;
+		int iM_dimN = iM * dimN;
+		int iM_dimQ = iM * 6;
 		for (int iN = 0; iN < dimN; iN++) 
 		{
-			int iM_nbf  = iM * nbf;
-			int iN_nbf  = iN * nbf;
-			int iM_dimQ = iM * dimQ;
-			int iN_dimQ = iN * dimQ;
-			double coef1_D_MN = coef[1] * D_MN[iM_nbf + iN];
+			int iN_dimP = iN * dimP;
+			int iN_dimQ = iN * 6;
+			double coef1_D_MN = coef[1] * D_MN[iM_dimN + iN];
 			double j_MN = 0.0;
 			for (int iP = 0; iP < dimP; iP++) 
 			{
-				int iP_nbf  = iP * nbf;
-				int iP_dimQ = iP * dimQ;
-				int Ibase = dimQ * (iP + dimP * (iN + dimN * iM));
-				double ncoef4_D_NP = -coef[4] * D_NP[iN_nbf + iP];
-				double ncoef5_D_MP = -coef[5] * D_MP[iM_nbf + iP];
+				int iP_dimQ = iP * 6;
+				int Ibase = 6 * (iP + dimP * (iN + dimN * iM));
+				double ncoef4_D_NP = -coef[4] * D_NP[iN_dimP + iP];
+				double ncoef5_D_MP = -coef[5] * D_MP[iM_dimP + iP];
 				double k_MP = 0.0, k_NP = 0.0;
 				
-				#pragma simd
-				for (int iQ = 0; iQ < dimQ; iQ++) 
+				for (int iQ = 0; iQ < 6; iQ++) 
 				{
 					double I = ERI[Ibase + iQ];
 					
-					j_MN += D_PQ[iP_nbf + iQ] * I;
-					k_MP -= D_NQ[iN_nbf + iQ] * I;
-					k_NP -= D_MQ[iM_nbf + iQ] * I;
+					j_MN += D_PQ[iP_dimQ + iQ] * I;
+					k_MP -= D_NQ[iN_dimQ + iQ] * I;
+					k_NP -= D_MQ[iM_dimQ + iQ] * I;
 
 					J_PQ_buf[iP_dimQ + iQ] +=  coef1_D_MN * I;
 					K_MQ_buf[iM_dimQ + iQ] += ncoef4_D_NP * I;
 					K_NQ_buf[iN_dimQ + iQ] += ncoef5_D_MP * I;
 				}
-				K_MP_buf[iM * dimP + iP] += coef[2] * k_MP;
-				K_NP_buf[iN * dimP + iP] += coef[3] * k_NP;
-			} // for (int iM = 0; iM < dimM; iM++) 
-			J_MN_buf[iM * dimN + iN] += coef[0] * j_MN;
-		} // for (int iQ = 0; iQ < dimQ; iQ++) 
-	} // for (int iN = 0; iN < dimN; iN++)
+				K_MP_buf[iM_dimP + iP] += coef[2] * k_MP;
+				K_NP_buf[iN_dimP + iP] += coef[3] * k_NP;
+			}  // for (int iP = 0; iP < dimP; iP++) 
+			J_MN_buf[iM_dimN + iN] += coef[0] * j_MN;
+		} // for (int iN = 0; iN < dimN; iN++) 
+	} // for (int iM = 0; iM < dimM; iM++) 
 	
 	// Update to global array using atomic_add_f64()
-	if (write_MN) atomic_update_global_block(J_MN, J_MN_buf, dimM, dimN, nbf);
+	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
 	
 	if (write_P)
 	{
-		atomic_update_global_block(K_MP, K_MP_buf, dimM, dimP, nbf);
-		atomic_update_global_block(K_NP, K_NP_buf, dimN, dimP, nbf);
+		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
+		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
 	}
 	
-	atomic_update_global_block(J_PQ, J_PQ_buf, dimP, dimQ, nbf);
-	atomic_update_global_block(K_MQ, K_MQ_buf, dimM, dimQ, nbf);
-	atomic_update_global_block(K_NQ, K_NQ_buf, dimN, dimQ, nbf);
+	atomic_update_vector(J_PQ, J_PQ_buf, dimP * 6);
+	atomic_update_vector(K_MQ, K_MQ_buf, dimM * 6);
+	atomic_update_vector(K_NQ, K_NQ_buf, dimN * 6);
 }
 
 void Accum_Fock_dimQ10(
@@ -480,43 +466,40 @@ void Accum_Fock_dimQ10(
 	int dimM = TinySCF->shell_bf_num[M];
 	int dimN = TinySCF->shell_bf_num[N];
 	int dimP = TinySCF->shell_bf_num[P];
-	int dimQ = 10; //TinySCF->shell_bf_num[Q];
-	int idxM = TinySCF->shell_bf_sind[M];
-	int idxN = TinySCF->shell_bf_sind[N];
-	int idxP = TinySCF->shell_bf_sind[P];
-	int idxQ = TinySCF->shell_bf_sind[Q];
+	int dimQ = 10; // TinySCF->shell_bf_num[Q];
+	int nshells = TinySCF->nshells;
 	
 	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat + idxM * nbf + idxN;
-	double *J_PQ = TinySCF->J_mat + idxP * nbf + idxQ;
-	double *K_MP = TinySCF->K_mat + idxM * nbf + idxP;
-	double *K_NP = TinySCF->K_mat + idxN * nbf + idxP;
-	double *K_MQ = TinySCF->K_mat + idxM * nbf + idxQ;
-	double *K_NQ = TinySCF->K_mat + idxN * nbf + idxQ;
+	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
-	double *D_MN = TinySCF->D_mat + idxM * nbf + idxN;
-	double *D_PQ = TinySCF->D_mat + idxP * nbf + idxQ;
-	double *D_MP = TinySCF->D_mat + idxM * nbf + idxP;
-	double *D_NP = TinySCF->D_mat + idxN * nbf + idxP;
-	double *D_MQ = TinySCF->D_mat + idxM * nbf + idxQ;
-	double *D_NQ = TinySCF->D_mat + idxN * nbf + idxQ;
+	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
 	// Set buffer pointer
 	double *thread_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
-	int required_buf_size = (dimP + dimN + dimM) * dimQ + (dimP + dimN + dimM) * dimQ;
+	int required_buf_size = (dimP + dimN + dimM) * 10 + (dimP + dimN + dimM) * 10;
 	assert(required_buf_size <= TinySCF->max_buf_size);
 	double *write_buf = thread_buf;
 	double *J_MN_buf = write_buf;  write_buf += dimM * dimN;
 	double *K_MP_buf = write_buf;  write_buf += dimM * dimP;
 	double *K_NP_buf = write_buf;  write_buf += dimN * dimP;
-	double *J_PQ_buf = write_buf;  write_buf += dimP * dimQ;
-	double *K_NQ_buf = write_buf;  write_buf += dimN * dimQ;
-	double *K_MQ_buf = write_buf;  write_buf += dimM * dimQ;
+	double *J_PQ_buf = write_buf;  write_buf += dimP * 10;
+	double *K_NQ_buf = write_buf;  write_buf += dimN * 10;
+	double *K_MQ_buf = write_buf;  write_buf += dimM * 10;
 
 	// Reset result buffer
 	if (load_MN) memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
 	if (load_P)  memset(K_MP_buf, 0, sizeof(double) * dimP * (dimM + dimN));
-	memset(J_PQ_buf, 0, sizeof(double) * dimQ * (dimM + dimN + dimP));
+	memset(J_PQ_buf, 0, sizeof(double) * 10 * (dimM + dimN + dimP));
 	
 	// Get uniqueness ERI symmetric 
 	double coef[7];
@@ -524,55 +507,54 @@ void Accum_Fock_dimQ10(
 	
 	for (int iM = 0; iM < dimM; iM++) 
 	{
+		int iM_dimP = iM * dimP;
+		int iM_dimN = iM * dimN;
+		int iM_dimQ = iM * 10;
 		for (int iN = 0; iN < dimN; iN++) 
 		{
-			int iM_nbf  = iM * nbf;
-			int iN_nbf  = iN * nbf;
-			int iM_dimQ = iM * dimQ;
-			int iN_dimQ = iN * dimQ;
-			double coef1_D_MN = coef[1] * D_MN[iM_nbf + iN];
+			int iN_dimP = iN * dimP;
+			int iN_dimQ = iN * 10;
+			double coef1_D_MN = coef[1] * D_MN[iM_dimN + iN];
 			double j_MN = 0.0;
 			for (int iP = 0; iP < dimP; iP++) 
 			{
-				int iP_nbf  = iP * nbf;
-				int iP_dimQ = iP * dimQ;
-				int Ibase = dimQ * (iP + dimP * (iN + dimN * iM));
-				double ncoef4_D_NP = -coef[4] * D_NP[iN_nbf + iP];
-				double ncoef5_D_MP = -coef[5] * D_MP[iM_nbf + iP];
+				int iP_dimQ = iP * 10;
+				int Ibase = 10 * (iP + dimP * (iN + dimN * iM));
+				double ncoef4_D_NP = -coef[4] * D_NP[iN_dimP + iP];
+				double ncoef5_D_MP = -coef[5] * D_MP[iM_dimP + iP];
 				double k_MP = 0.0, k_NP = 0.0;
 				
-				#pragma simd
-				for (int iQ = 0; iQ < dimQ; iQ++) 
+				for (int iQ = 0; iQ < 10; iQ++) 
 				{
 					double I = ERI[Ibase + iQ];
 					
-					j_MN += D_PQ[iP_nbf + iQ] * I;
-					k_MP -= D_NQ[iN_nbf + iQ] * I;
-					k_NP -= D_MQ[iM_nbf + iQ] * I;
+					j_MN += D_PQ[iP_dimQ + iQ] * I;
+					k_MP -= D_NQ[iN_dimQ + iQ] * I;
+					k_NP -= D_MQ[iM_dimQ + iQ] * I;
 
 					J_PQ_buf[iP_dimQ + iQ] +=  coef1_D_MN * I;
 					K_MQ_buf[iM_dimQ + iQ] += ncoef4_D_NP * I;
 					K_NQ_buf[iN_dimQ + iQ] += ncoef5_D_MP * I;
 				}
-				K_MP_buf[iM * dimP + iP] += coef[2] * k_MP;
-				K_NP_buf[iN * dimP + iP] += coef[3] * k_NP;
-			} // for (int iM = 0; iM < dimM; iM++) 
-			J_MN_buf[iM * dimN + iN] += coef[0] * j_MN;
-		} // for (int iQ = 0; iQ < dimQ; iQ++) 
-	} // for (int iN = 0; iN < dimN; iN++)
+				K_MP_buf[iM_dimP + iP] += coef[2] * k_MP;
+				K_NP_buf[iN_dimP + iP] += coef[3] * k_NP;
+			}  // for (int iP = 0; iP < dimP; iP++) 
+			J_MN_buf[iM_dimN + iN] += coef[0] * j_MN;
+		} // for (int iN = 0; iN < dimN; iN++) 
+	} // for (int iM = 0; iM < dimM; iM++) 
 	
 	// Update to global array using atomic_add_f64()
-	if (write_MN) atomic_update_global_block(J_MN, J_MN_buf, dimM, dimN, nbf);
+	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
 	
 	if (write_P)
 	{
-		atomic_update_global_block(K_MP, K_MP_buf, dimM, dimP, nbf);
-		atomic_update_global_block(K_NP, K_NP_buf, dimN, dimP, nbf);
+		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
+		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
 	}
 	
-	atomic_update_global_block(J_PQ, J_PQ_buf, dimP, dimQ, nbf);
-	atomic_update_global_block(K_MQ, K_MQ_buf, dimM, dimQ, nbf);
-	atomic_update_global_block(K_NQ, K_NQ_buf, dimN, dimQ, nbf);
+	atomic_update_vector(J_PQ, J_PQ_buf, dimP * dimQ);
+	atomic_update_vector(K_MQ, K_MQ_buf, dimM * dimQ);
+	atomic_update_vector(K_NQ, K_NQ_buf, dimN * dimQ);
 }
 
 void Accum_Fock_dimQ15(
@@ -585,43 +567,40 @@ void Accum_Fock_dimQ15(
 	int dimM = TinySCF->shell_bf_num[M];
 	int dimN = TinySCF->shell_bf_num[N];
 	int dimP = TinySCF->shell_bf_num[P];
-	int dimQ = 15; //TinySCF->shell_bf_num[Q];
-	int idxM = TinySCF->shell_bf_sind[M];
-	int idxN = TinySCF->shell_bf_sind[N];
-	int idxP = TinySCF->shell_bf_sind[P];
-	int idxQ = TinySCF->shell_bf_sind[Q];
+	int dimQ = 15; // TinySCF->shell_bf_num[Q];
+	int nshells = TinySCF->nshells;
 	
 	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat + idxM * nbf + idxN;
-	double *J_PQ = TinySCF->J_mat + idxP * nbf + idxQ;
-	double *K_MP = TinySCF->K_mat + idxM * nbf + idxP;
-	double *K_NP = TinySCF->K_mat + idxN * nbf + idxP;
-	double *K_MQ = TinySCF->K_mat + idxM * nbf + idxQ;
-	double *K_NQ = TinySCF->K_mat + idxN * nbf + idxQ;
+	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
-	double *D_MN = TinySCF->D_mat + idxM * nbf + idxN;
-	double *D_PQ = TinySCF->D_mat + idxP * nbf + idxQ;
-	double *D_MP = TinySCF->D_mat + idxM * nbf + idxP;
-	double *D_NP = TinySCF->D_mat + idxN * nbf + idxP;
-	double *D_MQ = TinySCF->D_mat + idxM * nbf + idxQ;
-	double *D_NQ = TinySCF->D_mat + idxN * nbf + idxQ;
+	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
 	// Set buffer pointer
 	double *thread_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
-	int required_buf_size = (dimP + dimN + dimM) * dimQ + (dimP + dimN + dimM) * dimQ;
+	int required_buf_size = (dimP + dimN + dimM) * 15 + (dimP + dimN + dimM) * 15;
 	assert(required_buf_size <= TinySCF->max_buf_size);
 	double *write_buf = thread_buf;
 	double *J_MN_buf = write_buf;  write_buf += dimM * dimN;
 	double *K_MP_buf = write_buf;  write_buf += dimM * dimP;
 	double *K_NP_buf = write_buf;  write_buf += dimN * dimP;
-	double *J_PQ_buf = write_buf;  write_buf += dimP * dimQ;
-	double *K_NQ_buf = write_buf;  write_buf += dimN * dimQ;
-	double *K_MQ_buf = write_buf;  write_buf += dimM * dimQ;
+	double *J_PQ_buf = write_buf;  write_buf += dimP * 15;
+	double *K_NQ_buf = write_buf;  write_buf += dimN * 15;
+	double *K_MQ_buf = write_buf;  write_buf += dimM * 15;
 
 	// Reset result buffer
 	if (load_MN) memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
 	if (load_P)  memset(K_MP_buf, 0, sizeof(double) * dimP * (dimM + dimN));
-	memset(J_PQ_buf, 0, sizeof(double) * dimQ * (dimM + dimN + dimP));
+	memset(J_PQ_buf, 0, sizeof(double) * 15 * (dimM + dimN + dimP));
 	
 	// Get uniqueness ERI symmetric 
 	double coef[7];
@@ -629,55 +608,55 @@ void Accum_Fock_dimQ15(
 	
 	for (int iM = 0; iM < dimM; iM++) 
 	{
+		int iM_dimP = iM * dimP;
+		int iM_dimN = iM * dimN;
+		int iM_dimQ = iM * 15;
 		for (int iN = 0; iN < dimN; iN++) 
 		{
-			int iM_nbf  = iM * nbf;
-			int iN_nbf  = iN * nbf;
-			int iM_dimQ = iM * dimQ;
-			int iN_dimQ = iN * dimQ;
-			double coef1_D_MN = coef[1] * D_MN[iM_nbf + iN];
+			int iN_dimP = iN * dimP;
+			int iN_dimQ = iN * 15;
+			double coef1_D_MN = coef[1] * D_MN[iM_dimN + iN];
 			double j_MN = 0.0;
 			for (int iP = 0; iP < dimP; iP++) 
 			{
-				int iP_nbf  = iP * nbf;
-				int iP_dimQ = iP * dimQ;
+				int iP_dimQ = iP * 15;
 				int Ibase = dimQ * (iP + dimP * (iN + dimN * iM));
-				double ncoef4_D_NP = -coef[4] * D_NP[iN_nbf + iP];
-				double ncoef5_D_MP = -coef[5] * D_MP[iM_nbf + iP];
+				double ncoef4_D_NP = -coef[4] * D_NP[iN_dimP + iP];
+				double ncoef5_D_MP = -coef[5] * D_MP[iM_dimP + iP];
 				double k_MP = 0.0, k_NP = 0.0;
 				
 				#pragma simd
-				for (int iQ = 0; iQ < dimQ; iQ++) 
+				for (int iQ = 0; iQ < 15; iQ++) 
 				{
 					double I = ERI[Ibase + iQ];
 					
-					j_MN += D_PQ[iP_nbf + iQ] * I;
-					k_MP -= D_NQ[iN_nbf + iQ] * I;
-					k_NP -= D_MQ[iM_nbf + iQ] * I;
+					j_MN += D_PQ[iP_dimQ + iQ] * I;
+					k_MP -= D_NQ[iN_dimQ + iQ] * I;
+					k_NP -= D_MQ[iM_dimQ + iQ] * I;
 
 					J_PQ_buf[iP_dimQ + iQ] +=  coef1_D_MN * I;
 					K_MQ_buf[iM_dimQ + iQ] += ncoef4_D_NP * I;
 					K_NQ_buf[iN_dimQ + iQ] += ncoef5_D_MP * I;
 				}
-				K_MP_buf[iM * dimP + iP] += coef[2] * k_MP;
-				K_NP_buf[iN * dimP + iP] += coef[3] * k_NP;
-			} // for (int iM = 0; iM < dimM; iM++) 
-			J_MN_buf[iM * dimN + iN] += coef[0] * j_MN;
-		} // for (int iQ = 0; iQ < dimQ; iQ++) 
-	} // for (int iN = 0; iN < dimN; iN++)
+				K_MP_buf[iM_dimP + iP] += coef[2] * k_MP;
+				K_NP_buf[iN_dimP + iP] += coef[3] * k_NP;
+			}  // for (int iP = 0; iP < dimP; iP++) 
+			J_MN_buf[iM_dimN + iN] += coef[0] * j_MN;
+		} // for (int iN = 0; iN < dimN; iN++) 
+	} // for (int iM = 0; iM < dimM; iM++) 
 	
 	// Update to global array using atomic_add_f64()
-	if (write_MN) atomic_update_global_block(J_MN, J_MN_buf, dimM, dimN, nbf);
+	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
 	
 	if (write_P)
 	{
-		atomic_update_global_block(K_MP, K_MP_buf, dimM, dimP, nbf);
-		atomic_update_global_block(K_NP, K_NP_buf, dimN, dimP, nbf);
+		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
+		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
 	}
 	
-	atomic_update_global_block(J_PQ, J_PQ_buf, dimP, dimQ, nbf);
-	atomic_update_global_block(K_MQ, K_MQ_buf, dimM, dimQ, nbf);
-	atomic_update_global_block(K_NQ, K_NQ_buf, dimN, dimQ, nbf);
+	atomic_update_vector(J_PQ, J_PQ_buf, dimP * 15);
+	atomic_update_vector(K_MQ, K_MQ_buf, dimM * 15);
+	atomic_update_vector(K_NQ, K_NQ_buf, dimN * 15);
 }
 
 void Accum_Fock_1111(
@@ -686,26 +665,22 @@ void Accum_Fock_1111(
 )
 {
 	// Set matrix size info
-	int nbf  = TinySCF->nbasfuncs;
-	int idxM = TinySCF->shell_bf_sind[M];
-	int idxN = TinySCF->shell_bf_sind[N];
-	int idxP = TinySCF->shell_bf_sind[P];
-	int idxQ = TinySCF->shell_bf_sind[Q];
+	int nshells = TinySCF->nshells;
 	
 	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat + idxM * nbf + idxN;
-	double *J_PQ = TinySCF->J_mat + idxP * nbf + idxQ;
-	double *K_MP = TinySCF->K_mat + idxM * nbf + idxP;
-	double *K_NP = TinySCF->K_mat + idxN * nbf + idxP;
-	double *K_MQ = TinySCF->K_mat + idxM * nbf + idxQ;
-	double *K_NQ = TinySCF->K_mat + idxN * nbf + idxQ;
+	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	
-	double *D_MN = TinySCF->D_mat + idxM * nbf + idxN;
-	double *D_PQ = TinySCF->D_mat + idxP * nbf + idxQ;
-	double *D_MP = TinySCF->D_mat + idxM * nbf + idxP;
-	double *D_NP = TinySCF->D_mat + idxN * nbf + idxP;
-	double *D_MQ = TinySCF->D_mat + idxM * nbf + idxQ;
-	double *D_NQ = TinySCF->D_mat + idxN * nbf + idxQ;
+	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
+	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 
 	// Get uniqueness ERI symmetric 
 	double coef[7];
