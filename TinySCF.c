@@ -360,9 +360,13 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 			// (P,Q), (MN|PQ) is always < shell_scrtol2 and will be screened
 			if (sp_scrval > eta)  
 			{
-				// Symmetric uniqueness check, from GTFock, not so sure about the mechanism...
-				if ((M > N) && ((M + N) % 2 == 1)) continue;
-				if ((M < N) && ((M + N) % 2 == 0)) continue;
+				// Symmetric uniqueness check, from GTFock
+				// if ((M > N) && ((M + N) % 2 == 1)) continue;
+				// if ((M < N) && ((M + N) % 2 == 0)) continue;
+				
+				// Make {N_i} in (M, N_i) as continuous as possible to get better
+				// memory access pattern and better performance
+				if (N > M) continue;
 				
 				TinySCF->uniq_sp_lid[nnz] = M;
 				TinySCF->uniq_sp_rid[nnz] = N;
