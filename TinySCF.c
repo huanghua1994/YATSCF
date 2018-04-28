@@ -471,7 +471,14 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		
 		printf("* Iteration runtime     = %.3lf (s)\n", et0 - st0);
 		printf("* Energy = %.10lf (%.10lf)", TinySCF->HF_energy + TinySCF->nuc_energy, TinySCF->HF_energy);
-		if (TinySCF->iter > 0) printf(", delta = %e\n", energy_delta); else printf("\n");
+		if (TinySCF->iter > 0) 
+		{
+			printf(", delta = %e\n", energy_delta); 
+		} else 
+		{
+			printf("\n");
+			energy_delta = 223;  // Prevent the SCF exit after 1st iteration when no SAD initial guess
+		}
 		
 		TinySCF->iter++;
 	}
