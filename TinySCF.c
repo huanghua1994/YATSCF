@@ -302,6 +302,33 @@ void TinySCF_compute_Hcore_Ovlp_mat(TinySCF_t TinySCF)
 	printf("TinySCF precompute Hcore, S, and X matrices over,  elapsed time = %.3lf (s)\n", TinySCF->S_Hcore_time);
 }
 
+static int cmp_pair(int M1, int N1, int M2, int N2)
+{
+	if (M1 == M2) return (N1 < N2);
+	else return (M1 < M2);
+}
+
+static void quickSort(int *M, int *N, int l, int r)
+{
+	int i = l, j = r, tmp;
+	int mid_M = M[(i + j) / 2];
+	int mid_N = N[(i + j) / 2];
+	while (i <= j)
+	{
+		while (cmp_pair(M[i], N[i], mid_M, mid_N)) i++;
+		while (cmp_pair(mid_M, mid_N, M[j], N[j])) j--;
+		if (i <= j)
+		{
+			tmp = M[i]; M[i] = M[j]; M[j] = tmp;
+			tmp = N[i]; N[i] = N[j]; N[j] = tmp;
+			
+			i++;  j--;
+		}
+	}
+	if (i < r) quickSort(M, N, i, r);
+	if (j > l) quickSort(M, N, l, j);
+}
+
 void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 {
 	assert(TinySCF != NULL);
@@ -360,21 +387,27 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
 			// (P,Q), (MN|PQ) is always < shell_scrtol2 and will be screened
 			if (sp_scrval > eta)  
 			{
-				// Symmetric uniqueness check, from GTFock
-				// if ((M > N) && ((M + N) % 2 == 1)) continue;
-				// if ((M < N) && ((M + N) % 2 == 0)) continue;
-				
 				// Make {N_i} in (M, N_i) as continuous as possible to get better
 				// memory access pattern and better performance
 				if (N > M) continue;
 				
-				TinySCF->uniq_sp_lid[nnz] = M;
-				TinySCF->uniq_sp_rid[nnz] = N;
+				// We want AM(M) >= AM(N) to avoid HRR
+				int MN_id = CMS_Simint_getShellpairAMIndex(TinySCF->simint, M, N);
+				int NM_id = CMS_Simint_getShellpairAMIndex(TinySCF->simint, N, M);
+				if (MN_id > NM_id)
+				{
+					TinySCF->uniq_sp_lid[nnz] = M;
+					TinySCF->uniq_sp_rid[nnz] = N;
+				} else {
+					TinySCF->uniq_sp_lid[nnz] = N;
+					TinySCF->uniq_sp_rid[nnz] = M;
+				}
 				nnz++;
 			}
 		}
 	}
 	TinySCF->num_uniq_sp = nnz;
+	quickSort(TinySCF->uniq_sp_lid, TinySCF->uniq_sp_rid, 0, nnz - 1);
 	
 	double et = get_wtime_sec();
 	TinySCF->shell_scr_time = et - st;
