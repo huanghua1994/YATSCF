@@ -21,25 +21,27 @@ static inline void unique_integral_coef(int M, int N, int P, int Q, double *coef
 	coef[5] = flag4 + flag7;  // for K_NQ
 }
 
-static inline void atomic_add_f64(volatile double *global_value, double addend)
+static inline void update_global_blocks(
+	int dimM, int dimN, int dimP, int dimQ, int write_P,
+	double *K_MP, double *K_MP_buf,	double *K_NP, double *K_NP_buf, 
+	double *J_PQ, double *J_PQ_buf,	double *K_MQ, double *K_MQ_buf, 
+	double *K_NQ, double *K_NQ_buf
+)
 {
-	uint64_t expected_value, new_value;
-	do {
-		double old_value = *global_value;
-		expected_value = _castf64_u64(old_value);
-		new_value = _castf64_u64(old_value + addend);
-	} while (!__sync_bool_compare_and_swap((volatile uint64_t*)global_value, expected_value, new_value));
-}
-
-static inline void atomic_update_vector(double *dst, double *src, int length)
-{
-	for (int i = 0; i < length; i++)
-		atomic_add_f64(&dst[i], src[i]);
+	if (write_P)
+	{
+		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
+		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
+	}
+	
+	atomic_update_vector(J_PQ, J_PQ_buf, dimP * dimQ);
+	atomic_update_vector(K_MQ, K_MQ_buf, dimM * dimQ);
+	atomic_update_vector(K_NQ, K_NQ_buf, dimN * dimQ);
 }
 
 void Accum_Fock(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
+	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
+	double *ERI, int load_P, int write_P
 )
 {
 	// Set matrix size info
@@ -78,7 +80,7 @@ void Accum_Fock(
 	double *K_MQ_buf = write_buf;  write_buf += dimM * dimQ;
 
 	// Reset result buffer
-	if (load_MN) memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
+	//if (load_MN) memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
 	if (load_P)  memset(K_MP_buf, 0, sizeof(double) * dimP * (dimM + dimN));
 	memset(J_PQ_buf, 0, sizeof(double) * dimQ * (dimM + dimN + dimP));
 	
@@ -126,25 +128,19 @@ void Accum_Fock(
 	} // for (int iM = 0; iM < dimM; iM++) 
 	
 	// Update to global array using atomic_add_f64()
-	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
-	
-	if (write_P)
-	{
-		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
-		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
-	}
-	
-	atomic_update_vector(J_PQ, J_PQ_buf, dimP * dimQ);
-	atomic_update_vector(K_MQ, K_MQ_buf, dimM * dimQ);
-	atomic_update_vector(K_NQ, K_NQ_buf, dimN * dimQ);
+	update_global_blocks(
+		dimM, dimN, dimP, dimQ, write_P,
+		K_MP, K_MP_buf, K_NP, K_NP_buf,
+		J_PQ, J_PQ_buf, K_MQ, K_MQ_buf, K_NQ, K_NQ_buf
+	);
 }
 
 // ----- Specialized implementations of Accum_Fock with different dimQ -----
 // ----- We don't have function template in C, so we have to copy them -----
 
 void Accum_Fock_dimQ1(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
+	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
+	double *ERI, int load_P, int write_P
 )
 {
 	// Set matrix size info
@@ -183,7 +179,6 @@ void Accum_Fock_dimQ1(
 	double *K_MQ_buf = write_buf;  write_buf += dimM * dimQ;
 
 	// Reset result buffer
-	if (load_MN) memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
 	if (load_P)  memset(K_MP_buf, 0, sizeof(double) * dimP * (dimM + dimN));
 	memset(J_PQ_buf, 0, sizeof(double) * dimQ * (dimM + dimN + dimP));
 	
@@ -223,22 +218,16 @@ void Accum_Fock_dimQ1(
 	}  // for (int iM = 0; iM < dimM; iM++) 
 	
 	// Update to global array using atomic_add_f64()
-	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
-	
-	if (write_P)
-	{
-		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
-		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
-	}
-	
-	atomic_update_vector(J_PQ, J_PQ_buf, dimP * dimQ);
-	atomic_update_vector(K_MQ, K_MQ_buf, dimM * dimQ);
-	atomic_update_vector(K_NQ, K_NQ_buf, dimN * dimQ);
+	update_global_blocks(
+		dimM, dimN, dimP, dimQ, write_P,
+		K_MP, K_MP_buf, K_NP, K_NP_buf,	J_PQ, J_PQ_buf, 
+		K_MQ, K_MQ_buf, K_NQ, K_NQ_buf
+	);
 }
 
 void Accum_Fock_dimQ3(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
+	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
+	double *ERI, int load_P, int write_P
 )
 {
 	// Set matrix size info
@@ -277,7 +266,6 @@ void Accum_Fock_dimQ3(
 	double *K_MQ_buf = write_buf;  write_buf += dimM * 3;
 
 	// Reset result buffer
-	if (load_MN) memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
 	if (load_P)  memset(K_MP_buf, 0, sizeof(double) * dimP * (dimM + dimN));
 	memset(J_PQ_buf, 0, sizeof(double) * 3 * (dimM + dimN + dimP));
 	
@@ -325,22 +313,16 @@ void Accum_Fock_dimQ3(
 	}  // for (int iM = 0; iM < dimM; iM++) 
 	
 	// Update to global array using atomic_add_f64()
-	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
-	
-	if (write_P)
-	{
-		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
-		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
-	}
-	
-	atomic_update_vector(J_PQ, J_PQ_buf, dimP * 3);
-	atomic_update_vector(K_MQ, K_MQ_buf, dimM * 3);
-	atomic_update_vector(K_NQ, K_NQ_buf, dimN * 3);
+	update_global_blocks(
+		dimM, dimN, dimP, dimQ, write_P,
+		K_MP, K_MP_buf, K_NP, K_NP_buf,	J_PQ, J_PQ_buf, 
+		K_MQ, K_MQ_buf, K_NQ, K_NQ_buf
+	);
 }
 
 void Accum_Fock_dimQ6(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
+	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
+	double *ERI, int load_P, int write_P
 )
 {
 	// Set matrix size info
@@ -379,7 +361,6 @@ void Accum_Fock_dimQ6(
 	double *K_MQ_buf = write_buf;  write_buf += dimM * 6;
 
 	// Reset result buffer
-	if (load_MN) memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
 	if (load_P)  memset(K_MP_buf, 0, sizeof(double) * dimP * (dimM + dimN));
 	memset(J_PQ_buf, 0, sizeof(double) * 6 * (dimM + dimN + dimP));
 	
@@ -426,22 +407,16 @@ void Accum_Fock_dimQ6(
 	} // for (int iM = 0; iM < dimM; iM++) 
 	
 	// Update to global array using atomic_add_f64()
-	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
-	
-	if (write_P)
-	{
-		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
-		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
-	}
-	
-	atomic_update_vector(J_PQ, J_PQ_buf, dimP * 6);
-	atomic_update_vector(K_MQ, K_MQ_buf, dimM * 6);
-	atomic_update_vector(K_NQ, K_NQ_buf, dimN * 6);
+	update_global_blocks(
+		dimM, dimN, dimP, dimQ, write_P,
+		K_MP, K_MP_buf, K_NP, K_NP_buf,	J_PQ, J_PQ_buf, 
+		K_MQ, K_MQ_buf, K_NQ, K_NQ_buf
+	);
 }
 
 void Accum_Fock_dimQ10(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
+	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
+	double *ERI, int load_P, int write_P
 )
 {
 	// Set matrix size info
@@ -480,7 +455,6 @@ void Accum_Fock_dimQ10(
 	double *K_MQ_buf = write_buf;  write_buf += dimM * 10;
 
 	// Reset result buffer
-	if (load_MN) memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
 	if (load_P)  memset(K_MP_buf, 0, sizeof(double) * dimP * (dimM + dimN));
 	memset(J_PQ_buf, 0, sizeof(double) * 10 * (dimM + dimN + dimP));
 	
@@ -527,22 +501,16 @@ void Accum_Fock_dimQ10(
 	} // for (int iM = 0; iM < dimM; iM++) 
 	
 	// Update to global array using atomic_add_f64()
-	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
-	
-	if (write_P)
-	{
-		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
-		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
-	}
-	
-	atomic_update_vector(J_PQ, J_PQ_buf, dimP * dimQ);
-	atomic_update_vector(K_MQ, K_MQ_buf, dimM * dimQ);
-	atomic_update_vector(K_NQ, K_NQ_buf, dimN * dimQ);
+	update_global_blocks(
+		dimM, dimN, dimP, dimQ, write_P,
+		K_MP, K_MP_buf, K_NP, K_NP_buf,	J_PQ, J_PQ_buf, 
+		K_MQ, K_MQ_buf, K_NQ, K_NQ_buf
+	);
 }
 
 void Accum_Fock_dimQ15(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
+	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
+	double *ERI, int load_P, int write_P
 )
 {
 	// Set matrix size info
@@ -581,7 +549,6 @@ void Accum_Fock_dimQ15(
 	double *K_MQ_buf = write_buf;  write_buf += dimM * 15;
 
 	// Reset result buffer
-	if (load_MN) memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
 	if (load_P)  memset(K_MP_buf, 0, sizeof(double) * dimP * (dimM + dimN));
 	memset(J_PQ_buf, 0, sizeof(double) * 15 * (dimM + dimN + dimP));
 	
@@ -629,22 +596,16 @@ void Accum_Fock_dimQ15(
 	} // for (int iM = 0; iM < dimM; iM++) 
 	
 	// Update to global array using atomic_add_f64()
-	if (write_MN) atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
-	
-	if (write_P)
-	{
-		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
-		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
-	}
-	
-	atomic_update_vector(J_PQ, J_PQ_buf, dimP * 15);
-	atomic_update_vector(K_MQ, K_MQ_buf, dimM * 15);
-	atomic_update_vector(K_NQ, K_NQ_buf, dimN * 15);
+	update_global_blocks(
+		dimM, dimN, dimP, dimQ, write_P,
+		K_MP, K_MP_buf, K_NP, K_NP_buf,	J_PQ, J_PQ_buf, 
+		K_MQ, K_MQ_buf, K_NQ, K_NQ_buf
+	);
 }
 
 void Accum_Fock_1111(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, double *ERI,
-	int load_MN, int load_P, int write_MN, int write_P
+	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
+	double *ERI, int load_P, int write_P
 )
 {
 	// Set matrix size info
@@ -670,6 +631,7 @@ void Accum_Fock_1111(
 	unique_integral_coef(M, N, P, Q, coef);
 	
 	double I = ERI[0];
+	double *J_MN_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
 	
 	double vMN =  coef[0] * D_PQ[0] * I;
 	double vPQ =  coef[1] * D_MN[0] * I;
@@ -678,7 +640,8 @@ void Accum_Fock_1111(
 	double vMQ = -coef[4] * D_NP[0] * I;
 	double vNQ = -coef[5] * D_MP[0] * I;
 	
-	atomic_add_f64(&J_MN[0], vMN);
+	//atomic_add_f64(&J_MN[0], vMN);
+	J_MN_buf[0] += vMN;
 	atomic_add_f64(&J_PQ[0], vPQ);
 	atomic_add_f64(&K_MP[0], vMP);
 	atomic_add_f64(&K_NP[0], vNP);

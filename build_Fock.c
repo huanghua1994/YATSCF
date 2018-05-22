@@ -12,8 +12,7 @@
 #include "CMS.h"
 
 #define ACCUM_FOCK_PARAM 	TinySCF, tid, M, N, P_list[ipair], Q_list[ipair], \
-							thread_eris + ipair * thread_nints, \
-							load_MN, load_P, write_MN, write_P
+							thread_eris + ipair * thread_nints, load_P, write_P
 
 void Accum_Fock_with_KetshellpairList(
 	TinySCF_t TinySCF, int tid, int M, int N, 
@@ -171,6 +170,12 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 			int M = uniq_sp_lid[MN];
 			int N = uniq_sp_rid[MN];
 			double scrval1 = sp_scrval[M * nshells + N];
+			
+			double *J_MN_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
+			double *J_MN = J_mat_block + mat_block_ptr[M * nshells + N];
+			int dimM = shell_bf_num[M], dimN = shell_bf_num[N];
+			memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
+			
 			for (int PQ = 0; PQ < num_uniq_sp; PQ++)
 			{
 				int P = uniq_sp_lid[PQ];
@@ -227,8 +232,8 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 					
 					// Reset the computed ket-side shell pair list
 					target_shellpair_list->npairs = 0;
-				}
-			}
+				}  // if (target_shellpair_list->npairs == MAX_LIST_SIZE)
+			}  // for (int PQ = 0; PQ < num_uniq_sp; PQ++)
 			
 			// Handles all non-empty ket-side shell pair lists
 			for (int ket_id = 0; ket_id < MAX_AM_PAIRS; ket_id++)
@@ -267,9 +272,13 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 					
 					// Reset the computed ket-side shell pair list
 					target_shellpair_list->npairs = 0;
-				}
-			}
-		}
+				}  // if (target_shellpair_list->npairs > 0)
+			}  // for (int ket_id = 0; ket_id < MAX_AM_PAIRS; ket_id++)
+			
+			
+			atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
+			
+		}  // for (int MN = 0; MN < num_uniq_sp; MN++)
 		
 		// Free batch ERI auxiliary data structures
 		CMS_Simint_freeThreadMultishellpair(&thread_multi_shellpair);
