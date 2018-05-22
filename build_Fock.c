@@ -12,38 +12,49 @@
 #include "CMS.h"
 
 #define ACCUM_FOCK_PARAM 	TinySCF, tid, M, N, P_list[ipair], Q_list[ipair], \
-							thread_eris + ipair * thread_nints, load_P, write_P
+							thread_eris + ipair * thread_nints, load_P, write_P, \
+							thread_F_M_band_blocks, thread_M_bank_offset, \
+							thread_F_N_band_blocks, thread_N_bank_offset
 
 void Accum_Fock_with_KetshellpairList(
 	TinySCF_t TinySCF, int tid, int M, int N, 
 	int *P_list, int *Q_list, int npairs, 
-	double *thread_eris, int thread_nints
+	double *thread_eris, int thread_nints,
+	double *thread_F_M_band_blocks, double *thread_F_N_band_blocks,
+	int *thread_visited_Mpairs, int *thread_visited_Npairs
 )
 {
-	int load_MN, load_P, write_MN, write_P, prev_P = -1;
+	int load_P, write_P, prev_P = -1;
 	int dimM = TinySCF->shell_bf_num[M];
 	int dimN = TinySCF->shell_bf_num[N];
+	int thread_M_bank_offset = TinySCF->mat_block_ptr[M * TinySCF->nshells];
+    int thread_N_bank_offset = TinySCF->mat_block_ptr[N * TinySCF->nshells];
 	for (int ipair = 0; ipair < npairs; ipair++)
 	{
-		load_MN = (ipair == 0) ? 1 : 0;
-		load_P  = (prev_P == P_list[ipair]) ? 0 : 1;
+		int curr_P = P_list[ipair];
+		int curr_Q = Q_list[ipair];
+		
+		load_P  = (prev_P == curr_P) ? 0 : 1;
 		
 		write_P = 0;
 		if (ipair == npairs - 1)
 		{
-			write_MN = 1;
-			write_P  = 1;
+			write_P = 1;
 		} else {
-			write_MN = 0;
-			if (P_list[ipair] != P_list[ipair + 1]) write_P  = 1;
+			if (curr_P != P_list[ipair + 1]) write_P = 1;
 		}
-		prev_P = P_list[ipair];
+		prev_P = curr_P;
 		
-		int dimP = TinySCF->shell_bf_num[P_list[ipair]];
-		int dimQ = TinySCF->shell_bf_num[Q_list[ipair]];
+		thread_visited_Mpairs[curr_P] = 1;
+		thread_visited_Mpairs[curr_Q] = 1;
+		thread_visited_Npairs[curr_P] = 1;
+		thread_visited_Npairs[curr_Q] = 1;
+		
+		int dimP = TinySCF->shell_bf_num[curr_P];
+		int dimQ = TinySCF->shell_bf_num[curr_Q];
 		int is_1111 = dimM * dimN * dimP * dimQ;
 		
-		
+		/*
 		if (is_1111 == 1)    Accum_Fock_1111  (ACCUM_FOCK_PARAM);
 		else if (dimQ == 1)  Accum_Fock_dimQ1 (ACCUM_FOCK_PARAM);
 		else if (dimQ == 3)  Accum_Fock_dimQ3 (ACCUM_FOCK_PARAM);
@@ -51,6 +62,8 @@ void Accum_Fock_with_KetshellpairList(
 		else if (dimQ == 10) Accum_Fock_dimQ10(ACCUM_FOCK_PARAM);
 		else if (dimQ == 15) Accum_Fock_dimQ15(ACCUM_FOCK_PARAM);
 		else Accum_Fock(ACCUM_FOCK_PARAM);
+		*/
+		Accum_Fock(ACCUM_FOCK_PARAM);
 	}
 }
 
@@ -126,6 +139,7 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 	// Copy some parameters out, I don't want to see so many "TinySCF->"
 	int nshells         = TinySCF->nshells;
 	int num_uniq_sp     = TinySCF->num_uniq_sp;
+	int max_dim         = TinySCF->max_dim;
 	double scrtol2      = TinySCF->shell_scrtol2;
 	double *sp_scrval   = TinySCF->sp_scrval;
 	int *shell_bf_num   = TinySCF->shell_bf_num;
@@ -164,6 +178,11 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 		void *thread_multi_shellpair;
 		CMS_Simint_createThreadMultishellpair(&thread_multi_shellpair);
 		
+		double *thread_F_M_band_blocks = TinySCF->F_M_band_blocks + tid * num_bas_func * max_dim;
+		double *thread_F_N_band_blocks = TinySCF->F_N_band_blocks + tid * num_bas_func * max_dim;
+		int    *thread_visited_Mpairs  = TinySCF->visited_Mpairs  + tid * nshells;
+		int    *thread_visited_Npairs  = TinySCF->visited_Npairs  + tid * nshells;
+		
 		#pragma omp for schedule(dynamic)
 		for (int MN = 0; MN < num_uniq_sp; MN++)
 		{
@@ -175,6 +194,11 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 			double *J_MN = J_mat_block + mat_block_ptr[M * nshells + N];
 			int dimM = shell_bf_num[M], dimN = shell_bf_num[N];
 			memset(J_MN_buf, 0, sizeof(double) * dimM * dimN);
+			
+			memset(thread_F_M_band_blocks, 0, sizeof(double) * num_bas_func * max_dim);
+			memset(thread_F_N_band_blocks, 0, sizeof(double) * num_bas_func * max_dim);
+			memset(thread_visited_Mpairs,  0, sizeof(int)    * nshells);
+			memset(thread_visited_Npairs,  0, sizeof(int)    * nshells);
 			
 			for (int PQ = 0; PQ < num_uniq_sp; PQ++)
 			{
@@ -224,7 +248,9 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 							target_shellpair_list->P_list,
 							target_shellpair_list->Q_list,
 							target_shellpair_list->npairs,
-							thread_batch_eris, thread_nints
+							thread_batch_eris, thread_nints,
+							thread_F_M_band_blocks, thread_F_N_band_blocks,
+							thread_visited_Mpairs, thread_visited_Npairs
 						);
 						double et = get_wtime_sec();
 						if (tid == 0) CMS_Simint_addupdateFtimer(simint, et - st);
@@ -264,7 +290,9 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 							target_shellpair_list->P_list,
 							target_shellpair_list->Q_list,
 							target_shellpair_list->npairs,
-							thread_batch_eris, thread_nints
+							thread_batch_eris, thread_nints,
+							thread_F_M_band_blocks, thread_F_N_band_blocks,
+							thread_visited_Mpairs, thread_visited_Npairs
 						);
 						double et = get_wtime_sec();
 						if (tid == 0) CMS_Simint_addupdateFtimer(simint, et - st);
@@ -276,7 +304,27 @@ void TinySCF_build_FockMat(TinySCF_t TinySCF)
 			}  // for (int ket_id = 0; ket_id < MAX_AM_PAIRS; ket_id++)
 			
 			
-			atomic_update_vector(J_MN, J_MN_buf, dimM * dimN);
+			atomic_add_vector(J_MN, J_MN_buf, dimM * dimN);
+			int thread_M_bank_offset = mat_block_ptr[M * nshells];
+			int thread_N_bank_offset = mat_block_ptr[N * nshells];
+			for (int iPQ = 0; iPQ < nshells; iPQ++)
+			{
+				int dim_iPQ = shell_bf_num[iPQ];
+				if (thread_visited_Mpairs[iPQ]) 
+				{
+					int MPQ_block_ptr = mat_block_ptr[M * nshells + iPQ];
+					double *global_K_block_ptr = K_mat_block + MPQ_block_ptr;
+					double *thread_F_M_band_block_ptr = thread_F_M_band_blocks + MPQ_block_ptr - thread_M_bank_offset;
+					atomic_add_vector(global_K_block_ptr, thread_F_M_band_block_ptr, dimM * dim_iPQ);
+				}
+				if (thread_visited_Npairs[iPQ]) 
+				{
+					int NPQ_block_ptr = mat_block_ptr[N * nshells + iPQ];
+					double *global_K_block_ptr = K_mat_block + NPQ_block_ptr;
+					double *thread_F_N_band_block_ptr = thread_F_N_band_blocks + NPQ_block_ptr - thread_N_bank_offset;
+					atomic_add_vector(global_K_block_ptr, thread_F_N_band_block_ptr, dimN * dim_iPQ);
+				}
+			}
 			
 		}  // for (int MN = 0; MN < num_uniq_sp; MN++)
 		

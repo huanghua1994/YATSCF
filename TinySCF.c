@@ -55,8 +55,8 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	// Initialize OpenMP parallel info and buffer
 	int maxAM, max_buf_entry_size, total_buf_size;
 	maxAM = CMS_getMaxMomentum(TinySCF->basis);
-	max_buf_entry_size      = (maxAM + 1) * (maxAM + 2) / 2;
-	max_buf_entry_size      = max_buf_entry_size * max_buf_entry_size;
+	TinySCF->max_dim = (maxAM + 1) * (maxAM + 2) / 2;
+	max_buf_entry_size      = TinySCF->max_dim * TinySCF->max_dim;
 	TinySCF->nthreads       = omp_get_max_threads();
 	TinySCF->max_buf_size   = max_buf_entry_size * 6;
 	total_buf_size          = TinySCF->max_buf_size * TinySCF->nthreads;
@@ -128,16 +128,27 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	
 	// Allocate memory for blocked J, K and D matrices and the offsets of each block
 	// and compute the offsets of each block of J, K and D matrices
-	TinySCF->mat_block_ptr = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshellpairs);
-	TinySCF->J_mat_block   = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->K_mat_block   = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	TinySCF->D_mat_block   = (double*) ALIGN64B_MALLOC(mat_mem_size);
-	assert(TinySCF->mat_block_ptr != NULL);
-	assert(TinySCF->J_mat_block   != NULL);
-	assert(TinySCF->K_mat_block   != NULL);
-	assert(TinySCF->D_mat_block   != NULL);
+	size_t MN_band_mem_size  = DBL_SIZE * TinySCF->max_dim * TinySCF->nbasfuncs;
+	TinySCF->mat_block_ptr   = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshellpairs);
+	TinySCF->J_mat_block     = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->K_mat_block     = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->D_mat_block     = (double*) ALIGN64B_MALLOC(mat_mem_size);
+	TinySCF->F_M_band_blocks = (double*) ALIGN64B_MALLOC(MN_band_mem_size * TinySCF->nthreads);
+	TinySCF->F_N_band_blocks = (double*) ALIGN64B_MALLOC(MN_band_mem_size * TinySCF->nthreads);
+	TinySCF->visited_Mpairs  = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshells * TinySCF->nthreads);
+	TinySCF->visited_Npairs  = (int*)    ALIGN64B_MALLOC(INT_SIZE * TinySCF->nshells * TinySCF->nthreads);
+	assert(TinySCF->mat_block_ptr   != NULL);
+	assert(TinySCF->J_mat_block     != NULL);
+	assert(TinySCF->K_mat_block     != NULL);
+	assert(TinySCF->D_mat_block     != NULL);
+	assert(TinySCF->F_M_band_blocks != NULL);
+	assert(TinySCF->F_N_band_blocks != NULL);
+	assert(TinySCF->visited_Mpairs  != NULL);
+	assert(TinySCF->visited_Npairs  != NULL);
 	TinySCF->mem_size += (double) (3 * mat_mem_size);
 	TinySCF->mem_size += (double) (INT_SIZE * TinySCF->nshellpairs);
+	TinySCF->mem_size += (double) (2 * MN_band_mem_size * TinySCF->nthreads);
+	TinySCF->mem_size += (double) (2 * INT_SIZE * TinySCF->nshells * TinySCF->nthreads);
 	int pos = 0, idx = 0;
 	for (int i = 0; i < TinySCF->nshells; i++)
 	{
@@ -221,6 +232,10 @@ void free_TinySCF(TinySCF_t TinySCF)
 	ALIGN64B_FREE(TinySCF->J_mat_block);
 	ALIGN64B_FREE(TinySCF->K_mat_block);
 	ALIGN64B_FREE(TinySCF->D_mat_block);
+	ALIGN64B_FREE(TinySCF->F_M_band_blocks);
+	ALIGN64B_FREE(TinySCF->F_N_band_blocks);
+	ALIGN64B_FREE(TinySCF->visited_Mpairs);
+	ALIGN64B_FREE(TinySCF->visited_Npairs);
 	
 	// Free matrices and temporary arrays used in DIIS
 	ALIGN64B_FREE(TinySCF->F0_mat);

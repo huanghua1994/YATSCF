@@ -21,6 +21,13 @@ static inline void unique_integral_coef(int M, int N, int P, int Q, double *coef
 	coef[5] = flag4 + flag7;  // for K_NQ
 }
 
+static inline void direct_add_vector(double *dst, double *src, int length)
+{
+	#pragma simd
+	for (int i = 0; i < length; i++)
+		dst[i] += src[i];
+}
+
 static inline void update_global_blocks(
 	int dimM, int dimN, int dimP, int dimQ, int write_P,
 	double *K_MP, double *K_MP_buf,	double *K_NP, double *K_NP_buf, 
@@ -30,19 +37,16 @@ static inline void update_global_blocks(
 {
 	if (write_P)
 	{
-		atomic_update_vector(K_MP, K_MP_buf, dimM * dimP);
-		atomic_update_vector(K_NP, K_NP_buf, dimN * dimP);
+		direct_add_vector(K_MP, K_MP_buf, dimM * dimP);
+		direct_add_vector(K_NP, K_NP_buf, dimN * dimP);
 	}
 	
-	atomic_update_vector(J_PQ, J_PQ_buf, dimP * dimQ);
-	atomic_update_vector(K_MQ, K_MQ_buf, dimM * dimQ);
-	atomic_update_vector(K_NQ, K_NQ_buf, dimN * dimQ);
+	atomic_add_vector(J_PQ, J_PQ_buf, dimP * dimQ);
+	direct_add_vector(K_MQ, K_MQ_buf, dimM * dimQ);
+	direct_add_vector(K_NQ, K_NQ_buf, dimN * dimQ);
 }
 
-void Accum_Fock(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
-	double *ERI, int load_P, int write_P
-)
+void Accum_Fock(ACCUM_FOCK_IN_PARAM)
 {
 	// Set matrix size info
 	int nbf  = TinySCF->nbasfuncs;
@@ -52,20 +56,27 @@ void Accum_Fock(
 	int dimQ = TinySCF->shell_bf_num[Q];
 	int nshells = TinySCF->nshells;
 	
+	int *mat_block_ptr  = TinySCF->mat_block_ptr;
+	double *D_mat_block = TinySCF->D_mat_block;
+	
 	// Set global matrix pointers
 	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
 	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	//double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
+	//double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
+	//double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
+	//double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	double *K_MP = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + P] - thread_M_bank_offset); 
+    double *K_NP = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + P] - thread_N_bank_offset);
+    double *K_MQ = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + Q] - thread_M_bank_offset);
+    double *K_NQ = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + Q] - thread_N_bank_offset);
 	
-	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	double *D_MN = D_mat_block + mat_block_ptr[M * nshells + N];
+	double *D_PQ = D_mat_block + mat_block_ptr[P * nshells + Q];
+	double *D_MP = D_mat_block + mat_block_ptr[M * nshells + P];
+	double *D_NP = D_mat_block + mat_block_ptr[N * nshells + P];
+	double *D_MQ = D_mat_block + mat_block_ptr[M * nshells + Q];
+	double *D_NQ = D_mat_block + mat_block_ptr[N * nshells + Q];
 	
 	// Set buffer pointer
 	double *thread_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
@@ -138,6 +149,7 @@ void Accum_Fock(
 // ----- Specialized implementations of Accum_Fock with different dimQ -----
 // ----- We don't have function template in C, so we have to copy them -----
 
+/*
 void Accum_Fock_dimQ1(
 	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
 	double *ERI, int load_P, int write_P
@@ -648,3 +660,4 @@ void Accum_Fock_1111(
 	atomic_add_f64(&K_MQ[0], vMQ);
 	atomic_add_f64(&K_NQ[0], vNQ);
 }
+*/

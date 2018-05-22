@@ -25,6 +25,7 @@ struct TinySCF_struct
 	int nshellpairs;      // Number of shell pairs        (== nshells * nshells)
 	int num_uniq_sp;      // Number of unique shell pairs (== nshells * (nshells+1) / 2)
 	int mat_size;         // Size of matrices             (== nbasfuncs * nbasfuncs)
+	int max_dim;          // Maximum value of dim{M, N, P, Q}
 	
 	// SCF iteration info
 	int    niters, iter;  // Maximum and current SCF iteration
@@ -62,6 +63,10 @@ struct TinySCF_struct
 	double *K_mat_block;
 	double *D_mat_block;
 	int    *mat_block_ptr;
+	double *F_M_band_blocks;  // Thread-private buffer for F_MP and F_MQ blocks with the same M
+	double *F_N_band_blocks;  // Thread-private buffer for F_NP and F_NQ blocks with the same N
+	int    *visited_Mpairs;   // Flags for marking if (M, i) is updated 
+	int    *visited_Npairs;   // Flags for marking if (N, i) is updated 
 	
 	// Matrices and arrays for DIIS
 	double *F0_mat;       // Previous X^T * F * X matrices
