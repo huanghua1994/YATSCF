@@ -54,7 +54,6 @@ void Accum_Fock_with_KetshellpairList(
 		int dimQ = TinySCF->shell_bf_num[curr_Q];
 		int is_1111 = dimM * dimN * dimP * dimQ;
 		
-		/*
 		if (is_1111 == 1)    Accum_Fock_1111  (ACCUM_FOCK_PARAM);
 		else if (dimQ == 1)  Accum_Fock_dimQ1 (ACCUM_FOCK_PARAM);
 		else if (dimQ == 3)  Accum_Fock_dimQ3 (ACCUM_FOCK_PARAM);
@@ -62,8 +61,6 @@ void Accum_Fock_with_KetshellpairList(
 		else if (dimQ == 10) Accum_Fock_dimQ10(ACCUM_FOCK_PARAM);
 		else if (dimQ == 15) Accum_Fock_dimQ15(ACCUM_FOCK_PARAM);
 		else Accum_Fock(ACCUM_FOCK_PARAM);
-		*/
-		Accum_Fock(ACCUM_FOCK_PARAM);
 	}
 }
 

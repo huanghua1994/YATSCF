@@ -60,12 +60,7 @@ void Accum_Fock(ACCUM_FOCK_IN_PARAM)
 	double *D_mat_block = TinySCF->D_mat_block;
 	
 	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
 	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	//double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	//double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	//double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	//double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
 	double *K_MP = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + P] - thread_M_bank_offset); 
     double *K_NP = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + P] - thread_N_bank_offset);
     double *K_MQ = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + Q] - thread_M_bank_offset);
@@ -149,11 +144,7 @@ void Accum_Fock(ACCUM_FOCK_IN_PARAM)
 // ----- Specialized implementations of Accum_Fock with different dimQ -----
 // ----- We don't have function template in C, so we have to copy them -----
 
-/*
-void Accum_Fock_dimQ1(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
-	double *ERI, int load_P, int write_P
-)
+void Accum_Fock_dimQ1(ACCUM_FOCK_IN_PARAM)
 {
 	// Set matrix size info
 	int nbf  = TinySCF->nbasfuncs;
@@ -163,20 +154,22 @@ void Accum_Fock_dimQ1(
 	int dimQ = TinySCF->shell_bf_num[Q];
 	int nshells = TinySCF->nshells;
 	
-	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	int *mat_block_ptr  = TinySCF->mat_block_ptr;
+	double *D_mat_block = TinySCF->D_mat_block;
 	
-	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	// Set global matrix pointers
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + P] - thread_M_bank_offset); 
+    double *K_NP = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + P] - thread_N_bank_offset);
+    double *K_MQ = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + Q] - thread_M_bank_offset);
+    double *K_NQ = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + Q] - thread_N_bank_offset);
+	
+	double *D_MN = D_mat_block + mat_block_ptr[M * nshells + N];
+	double *D_PQ = D_mat_block + mat_block_ptr[P * nshells + Q];
+	double *D_MP = D_mat_block + mat_block_ptr[M * nshells + P];
+	double *D_NP = D_mat_block + mat_block_ptr[N * nshells + P];
+	double *D_MQ = D_mat_block + mat_block_ptr[M * nshells + Q];
+	double *D_NQ = D_mat_block + mat_block_ptr[N * nshells + Q];
 	
 	// Set buffer pointer
 	double *thread_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
@@ -237,10 +230,7 @@ void Accum_Fock_dimQ1(
 	);
 }
 
-void Accum_Fock_dimQ3(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
-	double *ERI, int load_P, int write_P
-)
+void Accum_Fock_dimQ3(ACCUM_FOCK_IN_PARAM)
 {
 	// Set matrix size info
 	int nbf  = TinySCF->nbasfuncs;
@@ -250,20 +240,22 @@ void Accum_Fock_dimQ3(
 	int dimQ = 3; // TinySCF->shell_bf_num[Q];
 	int nshells = TinySCF->nshells;
 	
-	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	int *mat_block_ptr  = TinySCF->mat_block_ptr;
+	double *D_mat_block = TinySCF->D_mat_block;
 	
-	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	// Set global matrix pointers
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + P] - thread_M_bank_offset); 
+    double *K_NP = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + P] - thread_N_bank_offset);
+    double *K_MQ = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + Q] - thread_M_bank_offset);
+    double *K_NQ = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + Q] - thread_N_bank_offset);
+	
+	double *D_MN = D_mat_block + mat_block_ptr[M * nshells + N];
+	double *D_PQ = D_mat_block + mat_block_ptr[P * nshells + Q];
+	double *D_MP = D_mat_block + mat_block_ptr[M * nshells + P];
+	double *D_NP = D_mat_block + mat_block_ptr[N * nshells + P];
+	double *D_MQ = D_mat_block + mat_block_ptr[M * nshells + Q];
+	double *D_NQ = D_mat_block + mat_block_ptr[N * nshells + Q];
 	
 	// Set buffer pointer
 	double *thread_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
@@ -332,10 +324,7 @@ void Accum_Fock_dimQ3(
 	);
 }
 
-void Accum_Fock_dimQ6(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
-	double *ERI, int load_P, int write_P
-)
+void Accum_Fock_dimQ6(ACCUM_FOCK_IN_PARAM)
 {
 	// Set matrix size info
 	int nbf  = TinySCF->nbasfuncs;
@@ -345,20 +334,22 @@ void Accum_Fock_dimQ6(
 	int dimQ = 6; // TinySCF->shell_bf_num[Q];
 	int nshells = TinySCF->nshells;
 	
-	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	int *mat_block_ptr  = TinySCF->mat_block_ptr;
+	double *D_mat_block = TinySCF->D_mat_block;
 	
-	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	// Set global matrix pointers
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + P] - thread_M_bank_offset); 
+    double *K_NP = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + P] - thread_N_bank_offset);
+    double *K_MQ = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + Q] - thread_M_bank_offset);
+    double *K_NQ = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + Q] - thread_N_bank_offset);
+	
+	double *D_MN = D_mat_block + mat_block_ptr[M * nshells + N];
+	double *D_PQ = D_mat_block + mat_block_ptr[P * nshells + Q];
+	double *D_MP = D_mat_block + mat_block_ptr[M * nshells + P];
+	double *D_NP = D_mat_block + mat_block_ptr[N * nshells + P];
+	double *D_MQ = D_mat_block + mat_block_ptr[M * nshells + Q];
+	double *D_NQ = D_mat_block + mat_block_ptr[N * nshells + Q];
 	
 	// Set buffer pointer
 	double *thread_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
@@ -426,10 +417,7 @@ void Accum_Fock_dimQ6(
 	);
 }
 
-void Accum_Fock_dimQ10(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
-	double *ERI, int load_P, int write_P
-)
+void Accum_Fock_dimQ10(ACCUM_FOCK_IN_PARAM)
 {
 	// Set matrix size info
 	int nbf  = TinySCF->nbasfuncs;
@@ -439,20 +427,22 @@ void Accum_Fock_dimQ10(
 	int dimQ = 10; // TinySCF->shell_bf_num[Q];
 	int nshells = TinySCF->nshells;
 	
-	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	int *mat_block_ptr  = TinySCF->mat_block_ptr;
+	double *D_mat_block = TinySCF->D_mat_block;
 	
-	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	// Set global matrix pointers
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + P] - thread_M_bank_offset); 
+    double *K_NP = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + P] - thread_N_bank_offset);
+    double *K_MQ = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + Q] - thread_M_bank_offset);
+    double *K_NQ = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + Q] - thread_N_bank_offset);
+	
+	double *D_MN = D_mat_block + mat_block_ptr[M * nshells + N];
+	double *D_PQ = D_mat_block + mat_block_ptr[P * nshells + Q];
+	double *D_MP = D_mat_block + mat_block_ptr[M * nshells + P];
+	double *D_NP = D_mat_block + mat_block_ptr[N * nshells + P];
+	double *D_MQ = D_mat_block + mat_block_ptr[M * nshells + Q];
+	double *D_NQ = D_mat_block + mat_block_ptr[N * nshells + Q];
 	
 	// Set buffer pointer
 	double *thread_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
@@ -520,10 +510,7 @@ void Accum_Fock_dimQ10(
 	);
 }
 
-void Accum_Fock_dimQ15(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
-	double *ERI, int load_P, int write_P
-)
+void Accum_Fock_dimQ15(ACCUM_FOCK_IN_PARAM)
 {
 	// Set matrix size info
 	int nbf  = TinySCF->nbasfuncs;
@@ -533,20 +520,22 @@ void Accum_Fock_dimQ15(
 	int dimQ = 15; // TinySCF->shell_bf_num[Q];
 	int nshells = TinySCF->nshells;
 	
-	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	int *mat_block_ptr  = TinySCF->mat_block_ptr;
+	double *D_mat_block = TinySCF->D_mat_block;
 	
-	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	// Set global matrix pointers
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + P] - thread_M_bank_offset); 
+    double *K_NP = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + P] - thread_N_bank_offset);
+    double *K_MQ = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + Q] - thread_M_bank_offset);
+    double *K_NQ = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + Q] - thread_N_bank_offset);
+	
+	double *D_MN = D_mat_block + mat_block_ptr[M * nshells + N];
+	double *D_PQ = D_mat_block + mat_block_ptr[P * nshells + Q];
+	double *D_MP = D_mat_block + mat_block_ptr[M * nshells + P];
+	double *D_NP = D_mat_block + mat_block_ptr[N * nshells + P];
+	double *D_MQ = D_mat_block + mat_block_ptr[M * nshells + Q];
+	double *D_NQ = D_mat_block + mat_block_ptr[N * nshells + Q];
 	
 	// Set buffer pointer
 	double *thread_buf = TinySCF->Accum_Fock_buf + tid * TinySCF->max_buf_size;
@@ -615,28 +604,27 @@ void Accum_Fock_dimQ15(
 	);
 }
 
-void Accum_Fock_1111(
-	TinySCF_t TinySCF, int tid, int M, int N, int P, int Q, 
-	double *ERI, int load_P, int write_P
-)
+void Accum_Fock_1111(ACCUM_FOCK_IN_PARAM)
 {
 	// Set matrix size info
 	int nshells = TinySCF->nshells;
 	
-	// Set global matrix pointers
-	double *J_MN = TinySCF->J_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *K_MP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *K_NP = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *K_MQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *K_NQ = TinySCF->K_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	int *mat_block_ptr  = TinySCF->mat_block_ptr;
+	double *D_mat_block = TinySCF->D_mat_block;
 	
-	double *D_MN = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + N];
-	double *D_PQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
-	double *D_MP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + P];
-	double *D_NP = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + P];
-	double *D_MQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[M * nshells + Q];
-	double *D_NQ = TinySCF->D_mat_block + TinySCF->mat_block_ptr[N * nshells + Q];
+	// Set global matrix pointers
+	double *J_PQ = TinySCF->J_mat_block + TinySCF->mat_block_ptr[P * nshells + Q];
+	double *K_MP = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + P] - thread_M_bank_offset); 
+    double *K_NP = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + P] - thread_N_bank_offset);
+    double *K_MQ = thread_F_M_band_blocks + (mat_block_ptr[M * nshells + Q] - thread_M_bank_offset);
+    double *K_NQ = thread_F_N_band_blocks + (mat_block_ptr[N * nshells + Q] - thread_N_bank_offset);
+	
+	double *D_MN = D_mat_block + mat_block_ptr[M * nshells + N];
+	double *D_PQ = D_mat_block + mat_block_ptr[P * nshells + Q];
+	double *D_MP = D_mat_block + mat_block_ptr[M * nshells + P];
+	double *D_NP = D_mat_block + mat_block_ptr[N * nshells + P];
+	double *D_MQ = D_mat_block + mat_block_ptr[M * nshells + Q];
+	double *D_NQ = D_mat_block + mat_block_ptr[N * nshells + Q];
 
 	// Get uniqueness ERI symmetric 
 	double coef[7];
@@ -652,12 +640,10 @@ void Accum_Fock_1111(
 	double vMQ = -coef[4] * D_NP[0] * I;
 	double vNQ = -coef[5] * D_MP[0] * I;
 	
-	//atomic_add_f64(&J_MN[0], vMN);
 	J_MN_buf[0] += vMN;
 	atomic_add_f64(&J_PQ[0], vPQ);
-	atomic_add_f64(&K_MP[0], vMP);
-	atomic_add_f64(&K_NP[0], vNP);
-	atomic_add_f64(&K_MQ[0], vMQ);
-	atomic_add_f64(&K_NQ[0], vNQ);
+	K_MP[0] += vMP;
+	K_NP[0] += vNP;
+	K_MQ[0] += vMQ;
+	K_NQ[0] += vNQ;
 }
-*/
