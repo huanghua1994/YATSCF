@@ -57,12 +57,14 @@ struct TinySCF_struct
 	double *eigval;       // Eigenvalues for building density matrix
 	int    *ev_idx;       // Index of eigenvalues, for sorting
 	double *tmp_mat;      // Temporary matrix
+	double *D2_mat;       // Temporary matrix used in purification
+	double *D3_mat;       // Temporary matrix used in purification
 	
 	// Blocked J, K and D matrices and the offsets of each block
-	double *J_mat_block;  
-	double *K_mat_block;
-	double *D_mat_block;
-	int    *mat_block_ptr;
+	double *J_mat_block;      // Blocked J matrix
+	double *K_mat_block;      // Blocked K matrix
+	double *D_mat_block;      // Blocked D matrix
+	int    *mat_block_ptr;    // Index of a given block's top-left element in the blocked matrix
 	double *F_M_band_blocks;  // Thread-private buffer for F_MP and F_MQ blocks with the same M
 	double *F_N_band_blocks;  // Thread-private buffer for F_NP and F_NQ blocks with the same N
 	int    *visited_Mpairs;   // Flags for marking if (M, i) is updated 
