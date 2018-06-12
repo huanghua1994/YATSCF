@@ -70,14 +70,6 @@ void TinySCF_build_DenMat(TinySCF_t TinySCF)
 				1.0, Cocc_mat, n_occ, Cocc_mat, n_occ, 0.0, D_mat, nbf);
 }
 
-static double matrix_trace(double *mat, const int ldm, const int nrows)
-{
-	double res = 0.0;
-	for (int i = 0; i < nrows; i++)
-		res += mat[i * ldm + i];
-	return res;
-}
-
 void TinySCF_build_DenMat_Purif(TinySCF_t TinySCF, int *purif_iter)
 {
 	double *F_mat    = TinySCF->F_mat;
@@ -107,7 +99,10 @@ void TinySCF_build_DenMat_Purif(TinySCF_t TinySCF, int *purif_iter)
 	}
 	
 	// Generate initial guess
-	double mu_bar  = matrix_trace(F_mat, nbf, nbf) / nbf;
+	double mu_bar  = 0.0;
+	for (int i = 0; i < nbf; i++)
+		mu_bar += F_mat[i * nbf + i];
+	mu_bar /= (double) nbf;
 	double lambda0 = (double) n_occ / (Hmax - mu_bar);
 	double lambda1 = (double) (nbf - n_occ) / (mu_bar - Hmin);
 	double lambda  = lambda0 < lambda1 ? lambda0 : lambda1;
@@ -129,37 +124,47 @@ void TinySCF_build_DenMat_Purif(TinySCF_t TinySCF, int *purif_iter)
 		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
 					1.0, D_mat, nbf, D2_mat, nbf, 0.0, D3_mat, nbf);
 		
-		double c, tr0, tr1;
-		for (int i = 0; i < nbf * nbf; i++)
-			tmp_mat[i] = D2_mat[i] - D3_mat[i];
-		tr0 = matrix_trace(tmp_mat, nbf, nbf);
-		for (int i = 0; i < nbf * nbf; i++)
-			tmp_mat[i] = D_mat[i] - D2_mat[i];
-		tr1 = matrix_trace(tmp_mat, nbf, nbf);
-		c  = tr0 / tr1;
+		double c, tr0 = 0.0, tr1 = 0.0;
+		for (int i = 0; i < nbf; i++)
+		{
+			tr0 += D2_mat[i * nbf + i] - D3_mat[i * nbf + i];
+			tr1 += D_mat[i * nbf + i]  - D2_mat[i * nbf + i];
+		}
+		c = tr0 / tr1;
 		
+		double c0, c1, c2;
 		if (c <= 0.5)
 		{
-			double c0 = 1.0 - 2.0 * c;
-			double c1 = 1.0 + c;
-			double c2 = 1.0 / (1.0 - c);
-			#pragma simd
-			for (int i = 0; i < nbf * nbf; i++)
-				D_mat[i] = (c0 * D_mat[i] + c1 * D2_mat[i] - D3_mat[i]) * c2;
+			c0 = 1.0 - 2.0 * c;
+			c1 = 1.0 + c;
+			c2 = 1.0 / (1.0 - c);
 		} else {
-			double c1 = 1.0 + c;
-			double c2 = 1.0 / c;
-			#pragma simd
-			for (int i = 0; i < nbf * nbf; i++)
-				D_mat[i] = (c1 * D2_mat[i] - D3_mat[i]) * c2;
+			c1 = 1.0 + c;
+			c2 = 1.0 / c;
 		}
 		
-		// Compute the Frobenius of D - D^2 
 		double err_norm = 0.0;
-		for (int i = 0; i < nbf * nbf; i++)
+		
+		#pragma omp parallel
 		{
-			double diff = D_mat[i] - D2_mat[i];
-			err_norm += diff * diff;
+			if (c <= 0.5)
+			{
+				#pragma omp for reduction(+:err_norm)
+				for (int i = 0; i < nbf * nbf; i++)
+				{
+					D_mat[i] = (c0 * D_mat[i] + c1 * D2_mat[i] - D3_mat[i]) * c2;
+					double diff = D_mat[i] - D2_mat[i];
+					err_norm += diff * diff;
+				}
+			} else {
+				#pragma omp for reduction(+:err_norm)
+				for (int i = 0; i < nbf * nbf; i++)
+				{
+					D_mat[i] = (c1 * D2_mat[i] - D3_mat[i]) * c2;
+					double diff = D_mat[i] - D2_mat[i];
+					err_norm += diff * diff;
+				}
+			}
 		}
 		err_norm = sqrt(err_norm);
 		

@@ -488,6 +488,13 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 	TinySCF->iter = 0;
 	double prev_energy  = 0;
 	double energy_delta = 223;
+	int use_purif = 1;
+	char *use_purif_str = getenv("USE_PURIF");
+	if (use_purif_str != NULL)
+	{
+		use_purif = atoi(use_purif_str);
+		if (use_purif != 0) use_purif = 1;
+	}
 	while ((TinySCF->iter < TinySCF->niters) && (energy_delta >= TinySCF->ene_tol))
 	{
 		printf("--------------- Iteration %d ---------------\n", TinySCF->iter);
@@ -517,11 +524,20 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		
 		// Diagonalize and build the density matrix
 		st1 = get_wtime_sec();
-		// TinySCF_build_DenMat(TinySCF);
 		int iter;
-		TinySCF_build_DenMat_Purif(TinySCF, &iter);
+		if (use_purif)
+		{
+			TinySCF_build_DenMat_Purif(TinySCF, &iter);
+		} else {
+			TinySCF_build_DenMat(TinySCF);
+		}
 		et1 = get_wtime_sec();
-		printf("* Build density matrix  : %.3lf (s), purification iterations = %d\n", et1 - st1, iter);
+		if (use_purif)
+		{
+			printf("* Build density matrix  : %.3lf (s), purification iterations = %d\n", et1 - st1, iter);
+		} else {
+			printf("* Build density matrix  : %.3lf (s)\n", et1 - st1);
+		}
 		
 		et0 = get_wtime_sec();
 		
