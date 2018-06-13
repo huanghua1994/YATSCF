@@ -488,13 +488,18 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 	TinySCF->iter = 0;
 	double prev_energy  = 0;
 	double energy_delta = 223;
-	int use_purif = 1;
-	char *use_purif_str = getenv("USE_PURIF");
-	if (use_purif_str != NULL)
+
+	int build_den = 0;
+	char *build_den_str = getenv("BUILD_DEN");
+	if (build_den_str != NULL)
 	{
-		use_purif = atoi(use_purif_str);
-		if (use_purif != 0) use_purif = 1;
+		build_den = atoi(build_den_str);
+		if ((build_den < 0) || (build_den > 2)) build_den = 0;
 	}
+	if (build_den == 0) printf("Use diagonalization to build density matrix\n");
+	if (build_den == 1) printf("Use Canon. Purif. to build density matrix, max iter = %d, tol = %e\n", MAX_PURIF_ITER, PURIF_TOL);
+	if (build_den == 2) printf("Use SP2 to build density matrix, max iter = %d, tol = %e\n", MAX_SP2_ITER, SP2_TOL);
+
 	while ((TinySCF->iter < TinySCF->niters) && (energy_delta >= TinySCF->ene_tol))
 	{
 		printf("--------------- Iteration %d ---------------\n", TinySCF->iter);
@@ -525,19 +530,13 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		// Diagonalize and build the density matrix
 		st1 = get_wtime_sec();
 		int iter;
-		if (use_purif)
-		{
-			TinySCF_build_DenMat_Purif(TinySCF, &iter);
-		} else {
-			TinySCF_build_DenMat(TinySCF);
-		}
-		et1 = get_wtime_sec();
-		if (use_purif)
-		{
-			printf("* Build density matrix  : %.3lf (s), purification iterations = %d\n", et1 - st1, iter);
-		} else {
-			printf("* Build density matrix  : %.3lf (s)\n", et1 - st1);
-		}
+		if (build_den == 0) TinySCF_build_DenMat(TinySCF);
+		if (build_den == 1) TinySCF_build_DenMat_Purif(TinySCF, &iter);
+		if (build_den == 2) TinySCF_build_DenMat_SP2(TinySCF, &iter);
+		et1 = get_wtime_sec(); 
+		if (build_den == 0) printf("* Build density matrix  : %.3lf (s)\n", et1 - st1);
+		if (build_den == 1) printf("* Build density matrix  : %.3lf (s), Canon. Purif. iterations = %d\n", et1 - st1, iter);
+		if (build_den == 2) printf("* Build density matrix  : %.3lf (s), SP2 iterations = %d\n", et1 - st1, iter);
 		
 		et0 = get_wtime_sec();
 		

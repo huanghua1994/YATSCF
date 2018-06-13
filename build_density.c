@@ -70,25 +70,15 @@ void TinySCF_build_DenMat(TinySCF_t TinySCF)
 				1.0, Cocc_mat, n_occ, Cocc_mat, n_occ, 0.0, D_mat, nbf);
 }
 
-void TinySCF_build_DenMat_Purif(TinySCF_t TinySCF, int *purif_iter)
+static void Gerschgorin_MaxMin(double *M, int ldm, int nrows, double *max_ev, double *min_ev)
 {
-	double *F_mat    = TinySCF->F_mat;
-	double *D_mat    = TinySCF->D_mat;
-	double *D2_mat   = TinySCF->D2_mat;
-	double *D3_mat   = TinySCF->D3_mat;
-	double *X_mat    = TinySCF->X_mat;
-	double *tmp_mat  = TinySCF->tmp_mat;
-	int    nbf       = TinySCF->nbasfuncs;
-	int    n_occ     = TinySCF->n_occ;
-	
-	// Gerschgorin's formula to estimate eigenvalue range
 	double Hmax = -DBL_MAX, Hmin = DBL_MAX;
-	for (int i = 0; i < nbf; i++)
+	for (int i = 0; i < nrows; i++)
 	{
 		double row_abs_sum = 0.0;
-		double *row_ptr = F_mat + i * nbf;
+		double *row_ptr = M + i * ldm;
 		double Fii, Hmin0, Hmax0;
-		for (int j = 0; j < nbf; j++)
+		for (int j = 0; j < nrows; j++)
 			row_abs_sum += fabs(row_ptr[j]);
 		Fii = row_ptr[i];
 		row_abs_sum -= fabs(Fii);
@@ -97,6 +87,24 @@ void TinySCF_build_DenMat_Purif(TinySCF_t TinySCF, int *purif_iter)
 		if (Hmin0 < Hmin) Hmin = Hmin0;
 		if (Hmax0 > Hmax) Hmax = Hmax0;
 	}
+	*max_ev = Hmax;
+	*min_ev = Hmin;
+}
+
+void TinySCF_build_DenMat_Purif(TinySCF_t TinySCF, int *purif_iter)
+{
+	double *F_mat   = TinySCF->F_mat;
+	double *D_mat   = TinySCF->D_mat;
+	double *D2_mat  = TinySCF->D2_mat;
+	double *D3_mat  = TinySCF->D3_mat;
+	double *X_mat   = TinySCF->X_mat;
+	double *tmp_mat = TinySCF->tmp_mat;
+	int    nbf      = TinySCF->nbasfuncs;
+	int    n_occ    = TinySCF->n_occ;
+	
+	// Gerschgorin's formula to estimate eigenvalue range
+	double Hmax, Hmin;
+	Gerschgorin_MaxMin(F_mat, nbf, nbf, &Hmax, &Hmin);
 	
 	// Generate initial guess
 	double mu_bar  = 0.0;
@@ -168,7 +176,7 @@ void TinySCF_build_DenMat_Purif(TinySCF_t TinySCF, int *purif_iter)
 		}
 		err_norm = sqrt(err_norm);
 		
-		if (err_norm < 1e-11)   break;
+		if (err_norm < PURIF_TOL)   break;
 		if ((c < 0) || (c > 1)) break;
 	}
 	
@@ -179,4 +187,65 @@ void TinySCF_build_DenMat_Purif(TinySCF_t TinySCF, int *purif_iter)
 				1.0, tmp_mat, nbf, X_mat, nbf, 0.0, D_mat, nbf);			
 	
 	*purif_iter = iter + 1;
+}
+
+void TinySCF_build_DenMat_SP2(TinySCF_t TinySCF, int *SP2_iter)
+{
+	double *F_mat   = TinySCF->F_mat;
+	double *D_mat   = TinySCF->D_mat;
+	double *X_mat   = TinySCF->X_mat;
+	double *tmp_mat = TinySCF->tmp_mat;
+	int    nbf      = TinySCF->nbasfuncs;
+	double n_elec   = 2.0 * TinySCF->n_occ;
+
+	// Gerschgorin's formula to estimate eigenvalue range
+	double Hmax, Hmin;
+	Gerschgorin_MaxMin(F_mat, nbf, nbf, &Hmax, &Hmin);
+
+	// Generate initial guess
+	double trace_D = 0.0, inv_ev_diff = 1.0 / (Hmax - Hmin);
+	for (int i = 0; i < nbf * nbf; i++)
+		D_mat[i] = -F_mat[i] * inv_ev_diff;
+	for (int i = 0; i < nbf; i++)
+	{
+		D_mat[i * nbf + i] += Hmax * inv_ev_diff;
+		trace_D += D_mat[i * nbf + i];
+	}
+
+	// SP2 iterations
+	int iter = 0;
+	for (iter = 0; iter < MAX_SP2_ITER; iter++)
+	{
+		memcpy(tmp_mat, D_mat, DBL_SIZE * nbf * nbf);
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
+					-1.0, D_mat, nbf, D_mat, nbf, 1.0, tmp_mat, nbf);
+
+		double trace_tmpD = 0;
+		for (int i = 0; i < nbf; i++)
+			trace_tmpD += tmp_mat[i * nbf + i];
+
+		double t1 = fabs(2.0 * (trace_D - trace_tmpD) - n_elec);
+		double t2 = fabs(2.0 * (trace_D + trace_tmpD) - n_elec);
+		if (t1 > t2)
+		{
+			for (int i = 0; i < nbf * nbf; i++)
+				D_mat[i] += tmp_mat[i];
+			trace_D += trace_tmpD;
+		} else {
+			for (int i = 0; i < nbf * nbf; i++)
+				D_mat[i] -= tmp_mat[i];
+			trace_D -= trace_tmpD;
+		}
+
+		double idem_err = fabs(trace_tmpD);
+		if (idem_err < SP2_TOL) break;
+	}
+
+	// D = X * D * X^T
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
+				1.0, X_mat, nbf, D_mat, nbf, 0.0, tmp_mat, nbf);
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, nbf, nbf, nbf, 
+				1.0, tmp_mat, nbf, X_mat, nbf, 0.0, D_mat, nbf);			
+	
+	*SP2_iter = iter + 1;
 }
