@@ -9,7 +9,7 @@ void TinySCF_build_DenMat(TinySCF_t TinySCF);
 // Build density matrix using Canonical Purification
 #define PURIF_TOL      1e-11
 #define MAX_PURIF_ITER 200
-void TinySCF_build_DenMat_Purif(TinySCF_t TinySCF, int *purif_iter);
+void TinySCF_build_DenMat_Canonical(TinySCF_t TinySCF, int *purif_iter);
 
 // Build density matrix using Second-order spectral projection (SP2)
 #define SP2_TOL        1e-11
@@ -17,15 +17,13 @@ void TinySCF_build_DenMat_Purif(TinySCF_t TinySCF, int *purif_iter);
 void TinySCF_build_DenMat_SP2(TinySCF_t TinySCF, int *SP2_iter);
 
 // Build density matrix using Stable, Scaled Newton-Schulz method (SSNS)
-// If use_scale == 0, this is the Mcweeny Purification
-// This is the sign function version
 #define SSNS_TOL       1e-11
 #define MAX_SSNS_ITER  200
-void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter, int use_scale);
+void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter);
 
 // Build density matrix using McWeeny Purification
-#define MCWEEENY_TOL       1e-11
-#define MAX_MCWEEENY_ITER  200
+#define MCWEENY_TOL       1e-11
+#define MAX_MCWEENY_ITER  200
 void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter);
 
 #endif

@@ -91,7 +91,7 @@ static void Gerschgorin_MaxMin(double *M, int ldm, int nrows, double *max_ev, do
 	*min_ev = Hmin;
 }
 
-void TinySCF_build_DenMat_Purif(TinySCF_t TinySCF, int *purif_iter)
+void TinySCF_build_DenMat_Canonical(TinySCF_t TinySCF, int *purif_iter)
 {
 	double *F_mat   = TinySCF->F_mat;
 	double *D_mat   = TinySCF->D_mat;
@@ -250,7 +250,7 @@ void TinySCF_build_DenMat_SP2(TinySCF_t TinySCF, int *SP2_iter)
 	*SP2_iter = iter + 1;
 }
 
-void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter, int use_scale)
+void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter)
 {
 	double *F_mat   = TinySCF->F_mat;
 	double *D_mat   = TinySCF->D_mat;
@@ -263,8 +263,8 @@ void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter, int use_scale)
 	int    nbf      = TinySCF->nbasfuncs;
 	int    n_occ    = TinySCF->n_occ;
 	
-	double mu, absHmax = 0, absHmin = 9e99;
-	double x, alpha_hat = 1.69770248525577;
+	double mu, lambda, Hmax, Hmin, inv;
+	double alpha_hat = 1.6977024852557676;
 	
 	// Solve the eigen system to get mu (chemical potential) and the max/min
 	// of negative and non-negative eigenvalues. In practice these values should
@@ -272,69 +272,66 @@ void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter, int use_scale)
 	memcpy(tmp_mat, F_mat, DBL_SIZE * TinySCF->mat_size);
 	LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', nbf, tmp_mat, nbf, eigval); 
 	quickSort(eigval, ev_idx, 0, nbf - 1);   // Sort the eigenvalues to ascending; we don't need ev_idx here
-	mu = (eigval[n_occ - 1] + eigval[n_occ]) * 0.5;
-	for (int i = 0; i < nbf; i++)   // Shift the eigenvalues for mu * I - F
+	mu     = (eigval[n_occ - 1] + eigval[n_occ]) * 0.5;
+	Hmax   = eigval[nbf - 1];
+	Hmin   = eigval[0];
+	inv    = (Hmax - mu) > (mu - Hmin) ? (Hmax - mu) : (mu - Hmin);
+	lambda = 1.0 / inv;
+	
+	double alpha, x;
+	double absHmax = 0, absHmin = 9e99;
+	for (int i = 0; i < nbf; i++)
 	{
-		eigval[i] = mu - eigval[i];
 		double abs_ev = fabs(eigval[i]);
-		if (abs_ev > absHmax) absHmax = abs_ev;
 		if (abs_ev < absHmin) absHmin = abs_ev;
+		if (abs_ev > absHmax) absHmax = abs_ev;
 	}
-	x = absHmin / absHmax;
+	x = (1.0 + absHmin / absHmax) * 0.5;
 	
 	double st = get_wtime_sec();
 	
-	// Generate initial guess
-	double inv_absHmax = 1.0 / absHmax;
+	// Shift the Fock matrix to get initial guess
+	double coef1 = -0.5 * lambda;
+	double coef2 = 0.5 * (lambda * mu + 1);
 	for (int i = 0; i < nbf * nbf; i++)
-		D_mat[i] = -F_mat[i] * inv_absHmax;
+		D_mat[i] = coef1 * F_mat[i];
 	for (int i = 0; i < nbf; i++)
-		D_mat[i * nbf + i] += mu * inv_absHmax;
-	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
-				1.0, D_mat, nbf, D_mat, nbf, 0.0, D2_mat, nbf);
+		D_mat[i * nbf + i] += coef2;
 	
 	// Purification iterations
 	int iter = 0;
-	for (iter = 0; iter < MAX_SP2_ITER; iter++)
+	for (iter = 0; iter < MAX_SSNS_ITER; iter++)
 	{
-		double alpha = sqrt(3.0 / (1.0 + x + x * x));
+		alpha = sqrt(3.0 / (1.0 - 2.0 * x + 4.0 * x * x));
 		if (alpha > alpha_hat) alpha = alpha_hat;
-		if (use_scale == 0) alpha = 1.0;
 		
-		double semi_alpha = 0.5 * alpha;
-		double neg_alpha2 = -alpha * alpha;
-		for (int i = 0; i < nbf * nbf; i++)
-		{
-			tmp_mat[i] = D_mat[i] * semi_alpha;
-			D2_mat[i] *= neg_alpha2;
-		}
-		for (int i = 0; i < nbf; i++)
-			D2_mat[i * nbf + i] += 3.0;
-		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
-					1.0, tmp_mat, nbf, D2_mat, nbf, 0.0, D_mat, nbf);
+		double alpha3 = alpha * alpha * alpha;
+		double coef0 = 0.5 - 0.75 * alpha + 0.25 * alpha3;
+		double coef1 = 1.5 * (alpha - alpha3);
+		double coef2 = 3.0 * alpha3;
+		double coef3 = -2.0 * alpha3;
+		
 		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
 					1.0, D_mat, nbf, D_mat, nbf, 0.0, D2_mat, nbf);
-		x = semi_alpha * x * (3.0 + neg_alpha2 * x * x);
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
+					1.0, D_mat, nbf, D2_mat, nbf, 0.0, D3_mat, nbf);
 		
-		// realD = (D + I)/2, realD2 = D^2/4 + D/2 + I/4
-		// realD2 - realD = D^2/4 - I/4, compute its Frobenius norm 
-		double err_norm = 0.0;
-		for (int i = 0; i < nbf; i++)
-			D2_mat[i * nbf + i] -= 1.0;
 		for (int i = 0; i < nbf * nbf; i++)
-			err_norm += D2_mat[i] * D2_mat[i];
-		err_norm /= 16.0;
+			D_mat[i] = coef1 * D_mat[i] + coef2 * D2_mat[i] + coef3 * D3_mat[i];
 		for (int i = 0; i < nbf; i++)
-			D2_mat[i * nbf + i] += 1.0;
+			D_mat[i * nbf + i] += coef0;
+		
+		x = coef0 + x * (coef1 + x * (coef2 + coef3 * x));
+		
+		double err_norm = 0.0;
+		for (int i = 0; i < nbf * nbf; i++)
+		{
+			double diff = D_mat[i] - D2_mat[i];
+			err_norm += diff * diff;
+		}
 		
 		if (err_norm < SSNS_TOL) break;
 	}
-	
-	// D = (D + I) / 2
-	for (int i = 0; i < nbf * nbf; i++)
-		D_mat[i] *= 0.5;
-	for (int i = 0; i < nbf; i++)
-		D_mat[i * nbf + i] += 0.5;
 	
 	// D = X * D * X^T
 	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
@@ -343,7 +340,7 @@ void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter, int use_scale)
 				1.0, tmp_mat, nbf, X_mat, nbf, 0.0, D_mat, nbf);			
 	
 	double et = get_wtime_sec();
-	printf("  SSNS actual time = %lf (s)\n", et - st);
+	printf("  SSNS Purif. actual time = %lf (s)\n", et - st);
 	
 	*SSNS_iter = iter + 1;
 }
@@ -387,7 +384,7 @@ void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter)
 	
 	// Purification iterations
 	int iter = 0;
-	for (iter = 0; iter < MAX_MCWEEENY_ITER; iter++)
+	for (iter = 0; iter < MAX_MCWEENY_ITER; iter++)
 	{
 		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
 					1.0, D_mat, nbf, D_mat, nbf, 0.0, D2_mat, nbf);
@@ -402,7 +399,7 @@ void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter)
 			err_norm += diff * diff;
 		}
 		
-		if (err_norm < MCWEEENY_TOL) break;
+		if (err_norm < MCWEENY_TOL) break;
 	}
 	
 	// D = X * D * X^T

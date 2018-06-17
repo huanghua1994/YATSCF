@@ -500,7 +500,7 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 	if (build_den == 1) printf("Use Canon. Purif. to build density matrix, max iter = %d, tol = %e\n", MAX_PURIF_ITER, PURIF_TOL);
 	if (build_den == 2) printf("Use SP2 to build density matrix, max iter = %d, tol = %e\n", MAX_SP2_ITER, SP2_TOL);
 	if (build_den == 3) printf("Use SSNS to build density matrix, max iter = %d, tol = %e\n", MAX_SSNS_ITER, SSNS_TOL);
-	if (build_den == 4) printf("Use McWeeny Purif. to build density matrix, max iter = %d, tol = %e\n", MAX_SSNS_ITER, SSNS_TOL);
+	if (build_den == 4) printf("Use McWeeny Purif. to build density matrix, max iter = %d, tol = %e\n", MAX_MCWEENY_ITER, MCWEENY_TOL);
 
 	while ((TinySCF->iter < TinySCF->niters) && (energy_delta >= TinySCF->ene_tol))
 	{
@@ -533,9 +533,9 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		st1 = get_wtime_sec();
 		int iter;
 		if (build_den == 0) TinySCF_build_DenMat(TinySCF);
-		if (build_den == 1) TinySCF_build_DenMat_Purif(TinySCF, &iter);
+		if (build_den == 1) TinySCF_build_DenMat_Canonical(TinySCF, &iter);
 		if (build_den == 2) TinySCF_build_DenMat_SP2(TinySCF, &iter);
-		if (build_den == 3) TinySCF_build_DenMat_SSNS(TinySCF, &iter, 1);
+		if (build_den == 3) TinySCF_build_DenMat_SSNS(TinySCF, &iter);
 		if (build_den == 4) TinySCF_build_DenMat_McWeeny(TinySCF, &iter);
 		et1 = get_wtime_sec(); 
 		printf("* Build density matrix  : %.3lf (s)", et1 - st1);
