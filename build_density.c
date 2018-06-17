@@ -327,7 +327,7 @@ void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter, int use_scale)
 		for (int i = 0; i < nbf; i++)
 			D2_mat[i * nbf + i] += 1.0;
 		
-		if (err_norm < 1e-11) break;
+		if (err_norm < SSNS_TOL) break;
 	}
 	
 	// D = (D + I) / 2
@@ -348,3 +348,71 @@ void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter, int use_scale)
 	*SSNS_iter = iter + 1;
 }
 
+void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter)
+{
+	double *F_mat   = TinySCF->F_mat;
+	double *D_mat   = TinySCF->D_mat;
+	double *D2_mat  = TinySCF->D2_mat;
+	double *D3_mat  = TinySCF->D3_mat;
+	double *X_mat   = TinySCF->X_mat;
+	double *tmp_mat = TinySCF->tmp_mat;
+	double *eigval  = TinySCF->eigval;
+	int    *ev_idx  = TinySCF->ev_idx;
+	int    nbf      = TinySCF->nbasfuncs;
+	int    n_occ    = TinySCF->n_occ;
+	
+	double mu, lambda, Hmax, Hmin, inv;
+	
+	// Solve the eigen system to get mu (chemical potential) and the max/min
+	// of negative and non-negative eigenvalues. In practice these values should
+	// be obtained by other faster methods
+	memcpy(tmp_mat, F_mat, DBL_SIZE * TinySCF->mat_size);
+	LAPACKE_dsyev(LAPACK_ROW_MAJOR, 'V', 'U', nbf, tmp_mat, nbf, eigval); 
+	quickSort(eigval, ev_idx, 0, nbf - 1);   // Sort the eigenvalues to ascending; we don't need ev_idx here
+	mu     = (eigval[n_occ - 1] + eigval[n_occ]) * 0.5;
+	Hmax   = eigval[nbf - 1];
+	Hmin   = eigval[0];
+	inv    = (Hmax - mu) > (mu - Hmin) ? (Hmax - mu) : (mu - Hmin);
+	lambda = 1.0 / inv;
+	
+	double st = get_wtime_sec();
+	
+	// Shift the Fock matrix to get initial guess
+	double coef1 = -0.5 * lambda;
+	double coef2 = 0.5 * (lambda * mu + 1);
+	for (int i = 0; i < nbf * nbf; i++)
+		D_mat[i] = coef1 * F_mat[i];
+	for (int i = 0; i < nbf; i++)
+		D_mat[i * nbf + i] += coef2;
+	
+	// Purification iterations
+	int iter = 0;
+	for (iter = 0; iter < MAX_MCWEEENY_ITER; iter++)
+	{
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
+					1.0, D_mat, nbf, D_mat, nbf, 0.0, D2_mat, nbf);
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
+					1.0, D_mat, nbf, D2_mat, nbf, 0.0, D3_mat, nbf);
+		
+		double err_norm = 0.0;
+		for (int i = 0; i < nbf * nbf; i++)
+		{
+			D_mat[i] = 3.0 * D2_mat[i] - 2.0 * D3_mat[i];
+			double diff = D_mat[i] - D2_mat[i];
+			err_norm += diff * diff;
+		}
+		
+		if (err_norm < MCWEEENY_TOL) break;
+	}
+	
+	// D = X * D * X^T
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
+				1.0, X_mat, nbf, D_mat, nbf, 0.0, tmp_mat, nbf);
+	cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans, nbf, nbf, nbf, 
+				1.0, tmp_mat, nbf, X_mat, nbf, 0.0, D_mat, nbf);			
+	
+	double et = get_wtime_sec();
+	printf("  McWeeny Purif. actual time = %lf (s)\n", et - st);
+	
+	*McWeeny_iter = iter + 1;
+}

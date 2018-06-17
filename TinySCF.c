@@ -536,7 +536,7 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		if (build_den == 1) TinySCF_build_DenMat_Purif(TinySCF, &iter);
 		if (build_den == 2) TinySCF_build_DenMat_SP2(TinySCF, &iter);
 		if (build_den == 3) TinySCF_build_DenMat_SSNS(TinySCF, &iter, 1);
-		if (build_den == 4) TinySCF_build_DenMat_SSNS(TinySCF, &iter, 0);
+		if (build_den == 4) TinySCF_build_DenMat_McWeeny(TinySCF, &iter);
 		et1 = get_wtime_sec(); 
 		printf("* Build density matrix  : %.3lf (s)", et1 - st1);
 		if (build_den == 0) printf("\n");
