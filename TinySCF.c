@@ -504,11 +504,12 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 
 	int use_DIIS = 1;
 	char *use_DIIS_str = getenv("USE_DIIS");
-	if (build_den_str != NULL)
+	if (use_DIIS_str != NULL)
 	{
-		use_DIIS = atoi(build_den_str);
+		use_DIIS = atoi(use_DIIS_str);
 		if ((use_DIIS < 0) || (use_DIIS > 1)) use_DIIS = 0;
 	}
+	printf("Use DIIS = %d\n", use_DIIS);
 	
 	while ((TinySCF->iter < TinySCF->niters) && (energy_delta >= TinySCF->ene_tol))
 	{
