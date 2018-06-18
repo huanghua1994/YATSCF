@@ -250,7 +250,7 @@ void TinySCF_build_DenMat_SP2(TinySCF_t TinySCF, int *SP2_iter)
 	*SP2_iter = iter + 1;
 }
 
-void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter)
+void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter_idem, int *SSNS_iter_comm)
 {
 	double *F_mat   = TinySCF->F_mat;
 	double *D_mat   = TinySCF->D_mat;
@@ -323,14 +323,38 @@ void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter)
 		
 		x = coef0 + x * (coef1 + x * (coef2 + coef3 * x));
 		
-		double err_norm = 0.0;
+		double idem_err_norm = 0.0;
 		for (int i = 0; i < nbf * nbf; i++)
 		{
 			double diff = D_mat[i] - D2_mat[i];
-			err_norm += diff * diff;
+			idem_err_norm += diff * diff;
 		}
+		idem_err_norm = sqrt(idem_err_norm);
 		
-		if (err_norm < SSNS_TOL) break;
+		double comm_err_norm = 0.0;
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
+					1.0, D_mat, nbf, F_mat, nbf, 0.0, D2_mat, nbf);
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
+					1.0, F_mat, nbf, D_mat, nbf, 0.0, D3_mat, nbf);
+		for (int i = 0; i < nbf * nbf; i++)
+		{
+			double diff = D2_mat[i] - D3_mat[i];
+			comm_err_norm += diff * diff;
+		}
+		comm_err_norm = sqrt(comm_err_norm);
+		
+		int can_stop = 0;
+		if (idem_err_norm < MCWEENY_TOL) 
+		{
+			*SSNS_iter_idem = iter + 1;
+			can_stop++;
+		}
+		if (comm_err_norm < MCWEENY_TOL) 
+		{
+			*SSNS_iter_comm = iter + 1;
+			can_stop++;
+		}
+		if (can_stop == 2) break;
 	}
 	
 	// D = X * D * X^T
@@ -341,11 +365,9 @@ void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter)
 	
 	double et = get_wtime_sec();
 	printf("  SSNS Purif. actual time = %lf (s)\n", et - st);
-	
-	*SSNS_iter = iter + 1;
 }
 
-void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter)
+void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter_idem, int *McWeeny_iter_comm)
 {
 	double *F_mat   = TinySCF->F_mat;
 	double *D_mat   = TinySCF->D_mat;
@@ -391,15 +413,39 @@ void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter)
 		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
 					1.0, D_mat, nbf, D2_mat, nbf, 0.0, D3_mat, nbf);
 		
-		double err_norm = 0.0;
+		double idem_err_norm = 0.0;
 		for (int i = 0; i < nbf * nbf; i++)
 		{
 			D_mat[i] = 3.0 * D2_mat[i] - 2.0 * D3_mat[i];
 			double diff = D_mat[i] - D2_mat[i];
-			err_norm += diff * diff;
+			idem_err_norm += diff * diff;
 		}
+		idem_err_norm = sqrt(idem_err_norm);
 		
-		if (err_norm < MCWEENY_TOL) break;
+		double comm_err_norm = 0.0;
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
+					1.0, D_mat, nbf, F_mat, nbf, 0.0, D2_mat, nbf);
+		cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nbf, nbf, nbf, 
+					1.0, F_mat, nbf, D_mat, nbf, 0.0, D3_mat, nbf);
+		for (int i = 0; i < nbf * nbf; i++)
+		{
+			double diff = D2_mat[i] - D3_mat[i];
+			comm_err_norm += diff * diff;
+		}
+		comm_err_norm = sqrt(comm_err_norm);
+		
+		int can_stop = 0;
+		if (idem_err_norm < MCWEENY_TOL) 
+		{
+			*McWeeny_iter_idem = iter + 1;
+			can_stop++;
+		}
+		if (comm_err_norm < MCWEENY_TOL) 
+		{
+			*McWeeny_iter_comm = iter + 1;
+			can_stop++;
+		}
+		if (can_stop == 2) break;
 	}
 	
 	// D = X * D * X^T
@@ -410,6 +456,4 @@ void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter)
 	
 	double et = get_wtime_sec();
 	printf("  McWeeny Purif. actual time = %lf (s)\n", et - st);
-	
-	*McWeeny_iter = iter + 1;
 }

@@ -19,11 +19,11 @@ void TinySCF_build_DenMat_SP2(TinySCF_t TinySCF, int *SP2_iter);
 // Build density matrix using Stable, Scaled Newton-Schulz method (SSNS)
 #define SSNS_TOL       1e-11
 #define MAX_SSNS_ITER  200
-void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter);
+void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter_idem, int *SSNS_iter_comm);
 
 // Build density matrix using McWeeny Purification
 #define MCWEENY_TOL       1e-11
 #define MAX_MCWEENY_ITER  200
-void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter);
+void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter_idem, int *McWeeny_iter_comm);
 
 #endif

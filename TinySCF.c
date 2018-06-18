@@ -502,6 +502,14 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 	if (build_den == 3) printf("Use SSNS to build density matrix, max iter = %d, tol = %e\n", MAX_SSNS_ITER, SSNS_TOL);
 	if (build_den == 4) printf("Use McWeeny Purif. to build density matrix, max iter = %d, tol = %e\n", MAX_MCWEENY_ITER, MCWEENY_TOL);
 
+	int use_DIIS = 1;
+	char *use_DIIS_str = getenv("USE_DIIS");
+	if (build_den_str != NULL)
+	{
+		use_DIIS = atoi(build_den_str);
+		if ((use_DIIS < 0) || (use_DIIS > 1)) use_DIIS = 0;
+	}
+	
 	while ((TinySCF->iter < TinySCF->niters) && (energy_delta >= TinySCF->ene_tol))
 	{
 		printf("--------------- Iteration %d ---------------\n", TinySCF->iter);
@@ -525,25 +533,28 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		
 		// DIIS (Pulay mixing)
 		st1 = get_wtime_sec();
+		int iter = TinySCF->iter;
+		if (use_DIIS == 0) TinySCF->iter = 0;
 		TinySCF_DIIS(TinySCF);
+		TinySCF->iter = iter;
 		et1 = get_wtime_sec();
 		printf("* DIIS procedure        : %.3lf (s)\n", et1 - st1);
 		
 		// Diagonalize and build the density matrix
 		st1 = get_wtime_sec();
-		int iter;
+		int iter_idem, iter_comm;
 		if (build_den == 0) TinySCF_build_DenMat(TinySCF);
 		if (build_den == 1) TinySCF_build_DenMat_Canonical(TinySCF, &iter);
 		if (build_den == 2) TinySCF_build_DenMat_SP2(TinySCF, &iter);
-		if (build_den == 3) TinySCF_build_DenMat_SSNS(TinySCF, &iter);
-		if (build_den == 4) TinySCF_build_DenMat_McWeeny(TinySCF, &iter);
+		if (build_den == 3) TinySCF_build_DenMat_SSNS(TinySCF, &iter_idem, &iter_comm);
+		if (build_den == 4) TinySCF_build_DenMat_McWeeny(TinySCF, &iter_idem, &iter_comm);
 		et1 = get_wtime_sec(); 
 		printf("* Build density matrix  : %.3lf (s)", et1 - st1);
 		if (build_den == 0) printf("\n");
 		if (build_den == 1) printf(", Canon. Purif. iterations = %d\n", iter);
 		if (build_den == 2) printf(", SP2 iterations = %d\n", iter);
-		if (build_den == 3) printf(", SSNS iterations = %d\n", iter);
-		if (build_den == 4) printf(", McWeeny Purif. iterations = %d\n", iter);
+		if (build_den == 3) printf(", SSNS iterations (idem, comm) = %d, %d\n", iter_idem, iter_comm);
+		if (build_den == 4) printf(", McWeeny Purif. iterations (idem, comm) = %d, %d\n", iter_idem, iter_comm);
 		
 		et0 = get_wtime_sec();
 		
