@@ -298,6 +298,9 @@ void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter_idem, int *SSNS
 	for (int i = 0; i < nbf; i++)
 		D_mat[i * nbf + i] += coef2;
 	
+	*SSNS_iter_idem = 99;
+	*SSNS_iter_comm = 99;
+
 	// Purification iterations
 	int iter = 0;
 	for (iter = 0; iter < MAX_SSNS_ITER; iter++)
@@ -346,12 +349,12 @@ void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter_idem, int *SSNS
 		int can_stop = 0;
 		if (idem_err_norm < MCWEENY_TOL) 
 		{
-			*SSNS_iter_idem = iter + 1;
+			if (*SSNS_iter_idem > iter + 1) *SSNS_iter_idem = iter + 1;
 			can_stop++;
 		}
 		if (comm_err_norm < MCWEENY_TOL) 
 		{
-			*SSNS_iter_comm = iter + 1;
+			if (*SSNS_iter_comm > iter + 1) *SSNS_iter_comm = iter + 1;
 			can_stop++;
 		}
 		if (can_stop == 2) break;
@@ -404,6 +407,9 @@ void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter_idem, int
 	for (int i = 0; i < nbf; i++)
 		D_mat[i * nbf + i] += coef2;
 	
+	*McWeeny_iter_idem = 99;
+	*McWeeny_iter_comm = 99;
+
 	// Purification iterations
 	int iter = 0;
 	for (iter = 0; iter < MAX_MCWEENY_ITER; iter++)
@@ -437,12 +443,12 @@ void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter_idem, int
 		int can_stop = 0;
 		if (idem_err_norm < MCWEENY_TOL) 
 		{
-			*McWeeny_iter_idem = iter + 1;
+			if (*McWeeny_iter_idem > iter + 1) *McWeeny_iter_idem = iter + 1;
 			can_stop++;
 		}
 		if (comm_err_norm < MCWEENY_TOL) 
 		{
-			*McWeeny_iter_comm = iter + 1;
+			if (*McWeeny_iter_comm > iter + 1) *McWeeny_iter_comm = iter + 1;
 			can_stop++;
 		}
 		if (can_stop == 2) break;
