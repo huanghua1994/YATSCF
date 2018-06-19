@@ -329,6 +329,7 @@ void TinySCF_build_DenMat_SSNS(TinySCF_t TinySCF, int *SSNS_iter)
 			double diff = D_mat[i] - D2_mat[i];
 			err_norm += diff * diff;
 		}
+		err_norm = sqrt(err_norm);
 		
 		if (err_norm < SSNS_TOL) break;
 	}
@@ -398,6 +399,7 @@ void TinySCF_build_DenMat_McWeeny(TinySCF_t TinySCF, int *McWeeny_iter)
 			double diff = D_mat[i] - D2_mat[i];
 			err_norm += diff * diff;
 		}
+		err_norm = sqrt(err_norm);
 		
 		if (err_norm < MCWEENY_TOL) break;
 	}
