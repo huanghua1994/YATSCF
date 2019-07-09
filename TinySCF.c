@@ -40,11 +40,11 @@ void init_TinySCF(TinySCF_t TinySCF, char *bas_fname, char *xyz_fname, const int
 	TinySCF->n_occ      = CMS_getNumOccOrb  (TinySCF->basis);
 	TinySCF->charge     = CMS_getTotalCharge(TinySCF->basis);
 	TinySCF->electron   = CMS_getNneutral   (TinySCF->basis);
-	char *basis_name    = basename(bas_fname);
-	char *molecule_name = basename(xyz_fname);
+	TinySCF->bas_name   = basename(bas_fname);
+	TinySCF->mol_name   = basename(xyz_fname);
 	printf("Job information:\n");
-	printf("    basis set         = %s\n", basis_name);
-	printf("    molecule          = %s\n", molecule_name);
+	printf("    basis set         = %s\n", TinySCF->bas_name);
+	printf("    molecule          = %s\n", TinySCF->mol_name);
 	printf("    # atoms           = %d\n", TinySCF->natoms);
 	printf("    # shells          = %d\n", TinySCF->nshells);
 	printf("    # basis functions = %d\n", TinySCF->nbasfuncs);
@@ -494,7 +494,7 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 	if (build_den_str != NULL)
 	{
 		build_den = atoi(build_den_str);
-		if ((build_den < 0) || (build_den > 4)) build_den = 0;
+		if ((build_den < 0) || (build_den > 4)) build_den = 2;
 	}
 	if (build_den == 0) printf("Use diagonalization to build density matrix\n");
 	if (build_den == 1) printf("Use Canon. Purif. to build density matrix, max iter = %d, tol = %e\n", MAX_PURIF_ITER, PURIF_TOL);
@@ -514,6 +514,35 @@ void TinySCF_do_SCF(TinySCF_t TinySCF)
 		TinySCF_build_FockMat(TinySCF);
 		et1 = get_wtime_sec();
 		printf("* Build Fock matrix     : %.3lf (s)\n", et1 - st1);
+        
+		#ifdef OUTPUT_DJK
+		if (TinySCF->iter == TinySCF->niters - 1)
+		{
+			char D_mat_fname[128], J_mat_fname[128], K_mat_fname[128];
+			memset(D_mat_fname, 0, 128);
+			memset(J_mat_fname, 0, 128);
+			memset(K_mat_fname, 0, 128);
+			sprintf(D_mat_fname, "D_%d_%s_%s.bin", TinySCF->nbasfuncs, TinySCF->mol_name, TinySCF->bas_name);
+			sprintf(J_mat_fname, "J_%d_%s_%s.bin", TinySCF->nbasfuncs, TinySCF->mol_name, TinySCF->bas_name);
+			sprintf(K_mat_fname, "K_%d_%s_%s.bin", TinySCF->nbasfuncs, TinySCF->mol_name, TinySCF->bas_name);
+			int nbf2 = TinySCF->nbasfuncs * TinySCF->nbasfuncs;
+			for (int i = 0; i < nbf2; i++) 
+			{
+				TinySCF->J_mat[i] *= 0.5;
+				TinySCF->K_mat[i] *= -1.0;
+			}
+			FILE *ouf;
+			ouf = fopen(D_mat_fname, "wb");
+			fwrite(TinySCF->D_mat, sizeof(double), nbf2, ouf);
+			fclose(ouf);
+			ouf = fopen(J_mat_fname, "wb");
+			fwrite(TinySCF->J_mat, sizeof(double), nbf2, ouf);
+			fclose(ouf);
+			ouf = fopen(K_mat_fname, "wb");
+			fwrite(TinySCF->K_mat, sizeof(double), nbf2, ouf);
+			fclose(ouf);
+		}
+		#endif
 		
 		// Calculate new system energy
 		st1 = get_wtime_sec();

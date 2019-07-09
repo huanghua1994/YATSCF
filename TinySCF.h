@@ -20,6 +20,7 @@ struct TinySCF_struct
 	int natoms, nshells;  // Number of atoms and shells
 	int nbasfuncs, n_occ; // Number of basis functions and occupied orbits
 	int charge, electron; // Charge and number of electrons 
+	char *bas_name, *mol_name;
 	
 	// Auxiliary variables 
 	int nshellpairs;      // Number of shell pairs        (== nshells * nshells)

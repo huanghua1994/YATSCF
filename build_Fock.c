@@ -78,6 +78,10 @@ static void TinySCF_HJKmat_to_Fmat(double *Hcore_mat, double *J_mat, double *K_m
 			int idx2 = icol * nbf + irow;
 			double Jval = (J_mat[idx1] + J_mat[idx2]) * 0.5;
 			double Kval = (K_mat[idx1] + K_mat[idx2]) * 0.5;
+			J_mat[idx1] = Jval;
+			J_mat[idx2] = Jval;
+			K_mat[idx1] = Kval;
+			K_mat[idx2] = Kval;
 			F_mat[idx1] = Hcore_mat[idx1] + Jval + Kval;
 			F_mat[idx2] = Hcore_mat[idx2] + Jval + Kval;
 		}
