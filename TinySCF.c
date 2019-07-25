@@ -5,6 +5,7 @@
 #include <math.h>
 #include <libgen.h>
 #include <float.h>
+#include <time.h>
 
 #include <mkl.h>
 
@@ -438,6 +439,46 @@ void TinySCF_compute_sq_Schwarz_scrvals(TinySCF_t TinySCF)
     printf("TinySCF precompute shell screening info over,      elapsed time = %.3lf (s)\n", TinySCF->shell_scr_time);
 }
 
+// Generate normal distribution random number, Marsaglia polar method
+// Input parameters:
+//   mu, sigma : Normal distribution parameters
+//   nelem     : Number of random numbers to be generated
+// Output parameter:
+//   x : Array, size nelem, generated random numbers
+void TinySCF_generate_normal_distribution(
+    const double mu, const double sigma,
+    const int nelem, double *x
+)
+{
+    double u1, u2, w, mult, x1, x2;
+    for (int i = 0; i < nelem - 1; i += 2)
+    {
+        do 
+        {
+            u1 = drand48() * 2.0 - 1.0;
+            u2 = drand48() * 2.0 - 1.0;
+            w  = u1 * u1 + u2 * u2;
+        } while (w >= 1.0 || w <= 1e-15);
+        mult = sqrt((-2.0 * log(w)) / w);
+        x1 = u1 * mult;
+        x2 = u2 * mult;
+        x[i]   = mu + sigma * x1;
+        x[i+1] = mu + sigma * x2;
+    }
+    if (nelem % 2)
+    {
+        do 
+        {
+            u1 = drand48() * 2.0 - 1.0;
+            u2 = drand48() * 2.0 - 1.0;
+            w  = u1 * u1 + u2 * u2;
+        } while (w >= 1.0 || w <= 1e-15);
+        mult = sqrt((-2.0 * log(w)) / w);
+        x1 = u1 * mult;
+        x[nelem - 1] = mu + sigma * x1;
+    }
+}
+
 void TinySCF_get_initial_guess(TinySCF_t TinySCF)
 {
     memset(TinySCF->D_mat, 0, DBL_SIZE * TinySCF->mat_size);
@@ -446,13 +487,42 @@ void TinySCF_get_initial_guess(TinySCF_t TinySCF)
     int spos, epos, ldg;
     int nbf  = TinySCF->nbasfuncs;
     
+    int init_guess_type  = 0; 
+    char *init_guess_str = getenv("INIT_GUESS");
+    if (init_guess_str != NULL) init_guess_type = atoi(init_guess_str);
+    if (init_guess_type > 1 || init_guess_type < 0) init_guess_type = 0; 
+    
     // Copy the SAD data to diagonal block of the density matrix
-    for (int i = 0; i < TinySCF->natoms; i++)
+    if (init_guess_type == 0)
     {
-        CMS_getInitialGuess(TinySCF->basis, i, &guess, &spos, &epos);
-        ldg = epos - spos + 1;
-        double *D_mat_ptr = TinySCF->D_mat + spos * nbf + spos;
-        copy_matrix_block(D_mat_ptr, nbf, guess, ldg, ldg, ldg);
+        for (int i = 0; i < TinySCF->natoms; i++)
+        {
+            CMS_getInitialGuess(TinySCF->basis, i, &guess, &spos, &epos);
+            ldg = epos - spos + 1;
+            double *D_mat_ptr = TinySCF->D_mat + spos * nbf + spos;
+            copy_matrix_block(D_mat_ptr, nbf, guess, ldg, ldg, ldg);
+        }
+    }
+    
+    // Use random gaussian matrix as initial guess
+    if (init_guess_type == 1)
+    {
+        printf("Using standard gaussian matrix as initial guess\n");
+        srand48(time(NULL));
+        int nbf = TinySCF->nbasfuncs;
+        double *D_mat = TinySCF->D_mat;
+        TinySCF_generate_normal_distribution(0.0, 1.0, TinySCF->mat_size, D_mat);
+        for (int i = 0; i < nbf; i++)
+        {
+            for (int j = i; j < nbf; j++)
+            {
+                int idx0 = i * nbf + j;
+                int idx1 = j * nbf + i;
+                double Dval = D_mat[idx0] + D_mat[idx1];
+                D_mat[idx0] = Dval;
+                D_mat[idx1] = Dval;
+            }
+        }
     }
     
     // Scaling the initial density matrix according to the charge and neutral
