@@ -33,7 +33,7 @@
 
 // for Simint, caller provides memory where integrals will be stored
 
-CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
+CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads, double prim_scrval)
 {
     CMS_ASSERT(nthreads > 0);
 
@@ -95,8 +95,9 @@ CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads)
     // Here we assume there are no unit shells (shells with zero orbital exponent)
     simint_normalize_shells(basis->nshells, s->shells);
 
+    if (prim_scrval < 0.0 || prim_scrval > 1) prim_scrval = 1e-14;
     s->screen_method = SIMINT_SCREEN_FASTSCHWARZ;
-    s->screen_tol    = 1.e-14;
+    s->screen_tol    = prim_scrval;
     printf("Simint screen method    = SIMINT_SCREEN_FASTSCHWARZ \n");
     printf("Simint prim screen tol  = %e\n", s->screen_tol);
 
@@ -470,7 +471,7 @@ CMS_computePairCoreH_Simint(BasisSet_t basis, Simint_t simint, int tid,
 
 void CMS_Simint_resetStatisInfo(Simint_t simint)
 {
-	int stat_info_size = sizeof(double) * simint->nthreads;
+    int stat_info_size = sizeof(double) * simint->nthreads;
     memset(simint->num_multi_shellpairs, 0, stat_info_size);
     memset(simint->sum_nprim,            0, stat_info_size);
     memset(simint->num_screened_prim,    0, stat_info_size);

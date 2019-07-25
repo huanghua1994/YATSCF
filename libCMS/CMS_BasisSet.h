@@ -67,7 +67,7 @@ struct BasisSet
     uint32_t max_momentum;
     uint32_t max_nexp;
     uint32_t max_nexp_id;
-	
+    
     int mem_size;
     
     char str_buf[512];

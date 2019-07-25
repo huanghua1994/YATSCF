@@ -6,23 +6,23 @@
 
 typedef struct
 {
-	// Number of shell pairs in the list
-	int npairs;
-	
-	// (P_list[i], Q_list[i]) are the shell pair ids for ket-side
+    // Number of shell pairs in the list
+    int npairs;
+    
+    // (P_list[i], Q_list[i]) are the shell pair ids for ket-side
     // AM(P_list[]) are the same, AM(Q_list[]) are the same
-	int *P_list, *Q_list;
+    int *P_list, *Q_list;
 } KetShellpairList;
 
 typedef KetShellpairList* KetShellpairList_t;
 
 typedef struct 
 {
-	// Shell pair lists for different AM pairs
+    // Shell pair lists for different AM pairs
     KetShellpairList *ket_shellpair_lists;  
-	
-	// Pointer to the memory space for all KetShellpairLists' storage
-	int *bufptr;
+    
+    // Pointer to the memory space for all KetShellpairLists' storage
+    int *bufptr;
 } ThreadKetShellpairLists;
 
 typedef ThreadKetShellpairLists* ThreadKetShellpairLists_t;
@@ -34,10 +34,10 @@ void init_KetShellpairList_with_buffer(KetShellpairList_t ket_shellpair_list, in
 // Frequently used, inline it
 static inline void add_shellpair_to_KetShellPairList(KetShellpairList_t ket_shellpair_list, int P, int Q)
 {
-	int index = ket_shellpair_list->npairs;
-	ket_shellpair_list->P_list[index] = P;
-	ket_shellpair_list->Q_list[index] = Q;
-	ket_shellpair_list->npairs++;
+    int index = ket_shellpair_list->npairs;
+    ket_shellpair_list->P_list[index] = P;
+    ket_shellpair_list->Q_list[index] = Q;
+    ket_shellpair_list->npairs++;
 }
 
 // We don't need a reset function for KetShellpairList, since we just need to set npairs = 0

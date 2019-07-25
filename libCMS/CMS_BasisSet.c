@@ -181,7 +181,7 @@ CMSStatus_t CMS_destroyBasisSet(BasisSet_t basis)
     free(basis->exp);
     free(basis->minexp);
     free(basis->norm);
-	
+    
     free(basis);
 
     return CMS_STATUS_SUCCESS;
@@ -528,8 +528,8 @@ CMSStatus_t CMS_import_basis(char *file, BasisSet_t basis)
     CMS_ASSERT(basis->bs_exp        != NULL);
     CMS_ASSERT(basis->bs_momentum   != NULL);
     CMS_ASSERT(basis->bs_eid        != NULL);
-	basis->mem_size += sizeof(int) * (basis->bs_nelements + natoms * 2 + 1 + nshells * 2)
-	                 + sizeof(double*) * nshells * 3;
+    basis->mem_size += sizeof(int) * (basis->bs_nelements + natoms * 2 + 1 + nshells * 2)
+                     + sizeof(double*) * nshells * 3;
     for (i = 0; i < basis->bs_nelements; i++) {
         basis->bs_eptr[i] = -1;
     }
@@ -750,114 +750,114 @@ CMSStatus_t CMS_loadChemicalSystem(BasisSet_t basis, char *bsfile, char *molfile
     CMSStatus_t status;
 
     // read xyz file
-	status = CMS_import_molecule(molfile, basis);
+    status = CMS_import_molecule(molfile, basis);
     if (status != CMS_STATUS_SUCCESS) return status;
 
     // read basis set
-	status = CMS_import_basis(bsfile, basis);
+    status = CMS_import_basis(bsfile, basis);
     if (status != CMS_STATUS_SUCCESS) return status;
     
     // parse xyz
-	status = CMS_parse_molecule(basis);
-	if (status != CMS_STATUS_SUCCESS) return status;
+    status = CMS_parse_molecule(basis);
+    if (status != CMS_STATUS_SUCCESS) return status;
 
     // import guess
-	status = CMS_import_guess(bsfile, basis);
-	if (status != CMS_STATUS_SUCCESS) return status;
+    status = CMS_import_guess(bsfile, basis);
+    if (status != CMS_STATUS_SUCCESS) return status;
 
     printf("CMS basis set memory usage = %.2lf MB\n", basis->mem_size / 1048576.0);
-	
+    
     return CMS_STATUS_SUCCESS;
 }
 
 int CMS_getNumAtoms(BasisSet_t basis)
 {
-	return basis->natoms;
+    return basis->natoms;
 }
 
 int CMS_getNumShells(BasisSet_t basis)
 {
-	return basis->nshells;
+    return basis->nshells;
 }
 
 int CMS_getNumFuncs(BasisSet_t basis)
 {
-	return basis->nfunctions;
+    return basis->nfunctions;
 }
 
 int CMS_getNumOccOrb(BasisSet_t basis)
 {
-	return ((basis->nelectrons - basis->Q)/2);
+    return ((basis->nelectrons - basis->Q)/2);
 }
 
 int CMS_getFuncStartInd(BasisSet_t basis, int shellid)
 {
-	return basis->f_start_id[shellid];
+    return basis->f_start_id[shellid];
 }
 
 int CMS_getFuncEndInd(BasisSet_t basis, int shellid)
 {
-	return basis->f_end_id[shellid];
+    return basis->f_end_id[shellid];
 }
 
 int CMS_getShellDim(BasisSet_t basis, int shellid)
 {
-	return (basis->f_end_id[shellid] - basis->f_start_id[shellid] + 1);
+    return (basis->f_end_id[shellid] - basis->f_start_id[shellid] + 1);
 }
 
 int CMS_getMaxShellDim(BasisSet_t basis)
 {
-	return basis->maxdim;
+    return basis->maxdim;
 }
 
 int CMS_getAtomStartInd(BasisSet_t basis, int atomid)
 {
-	return basis->s_start_id[atomid];
+    return basis->s_start_id[atomid];
 }
 
 int CMS_getAtomEndInd(BasisSet_t basis, int atomid)
 {
-	return basis->s_start_id[atomid + 1] - 1;
+    return basis->s_start_id[atomid + 1] - 1;
 }
 
 int CMS_getTotalCharge(BasisSet_t basis)
 {
-	return basis->Q;
+    return basis->Q;
 }
 
 int CMS_getNneutral(BasisSet_t basis)
 {
-	return basis->nelectrons;
+    return basis->nelectrons;
 }
 
 int CMS_getMaxMomentum(BasisSet_t basis)
 {
-	return basis->max_momentum;
+    return basis->max_momentum;
 }
 
 int CMS_getMaxPrimid(BasisSet_t basis)
 {
-	return basis->max_nexp_id;
+    return basis->max_nexp_id;
 }
 
 int CMS_getMaxnumExp(BasisSet_t basis)
 {
-	return basis->max_nexp;   
+    return basis->max_nexp;   
 }
 
 double CMS_getNucEnergy(BasisSet_t basis)
 {
-	return basis->ene_nuc;
+    return basis->ene_nuc;
 }
 
 void CMS_getInitialGuess(BasisSet_t basis, int atomid, double **guess, int *spos, int *epos)
 {
-	const int eid = basis->eid[atomid] - 1;
-	const int start_shell = basis->s_start_id[atomid];
-	const int end_shell = basis->s_start_id[atomid + 1];
-	*guess = basis->guess[basis->bs_eptr[eid]];
-	*spos  = basis->f_start_id[start_shell];
-	*epos  = basis->f_end_id[end_shell - 1];
+    const int eid = basis->eid[atomid] - 1;
+    const int start_shell = basis->s_start_id[atomid];
+    const int end_shell = basis->s_start_id[atomid + 1];
+    *guess = basis->guess[basis->bs_eptr[eid]];
+    *spos  = basis->f_start_id[start_shell];
+    *epos  = basis->f_end_id[end_shell - 1];
 }
 
 void CMS_getShellxyz(BasisSet_t basis, int shellid, double *x, double *y, double *z)

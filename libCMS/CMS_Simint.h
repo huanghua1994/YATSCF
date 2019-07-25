@@ -51,7 +51,7 @@ typedef struct Simint *Simint_t;
 extern "C" {
 #endif
 
-CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads);
+CMSStatus_t CMS_createSimint(BasisSet_t basis, Simint_t *simint, int nthreads, double prim_scrval);
 
 CMSStatus_t CMS_destroySimint(Simint_t simint, int show_stat);
 
