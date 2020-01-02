@@ -1,10 +1,12 @@
 # YATSCF: Yet Another Tiny SCF
 
+No longer maintained, please use [https://github.com/huanghua1994/YATDFT](https://github.com/huanghua1994/YATDFT)
+
 My final project for CSE 8803 Spring 2018, a HF-SCF program:
 
 * Written in C99, parallelized with OpenMP in single node ("Tiny");
 * Used [Simint](https://github.com/simint-chem/simint-generator) for ERIs;
-* Used SAD initial guess and DIIS(Pulay mixing) to accelerate SCF convergence.
+* Used SAD initial guess and CDIIS (Pulay mixing) to accelerate SCF convergence.
 
 In short, this program can be viewed as a tiny, more "formula translation" version of [GTFock](https://github.com/gtfock-chem/gtfock).
 
